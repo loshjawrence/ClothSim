@@ -24,14 +24,13 @@ class Particles {
 public:
     vector<Matrix<T, dim, 1>, aligned_allocator<Matrix<T,dim,1>>> pos;
     vector<Matrix<T, dim, 1>, aligned_allocator<Matrix<T,dim,1>>> vel;
-//    vector<Matrix<T,   1, 1>, aligned_allocator<Matrix<T,  1,1>>> mass;
     vector<T> mass;
     static constexpr T RAND_POS_SCALE = 0.5;
     static constexpr T RAND_VEL_SCALE = 0.5;
 
 public:
     Particles();                    //create empty set of particles
-    Particles(int N);               //create N particles
+    Particles(const int N);               //create N particles
     ~Particles();
 
 

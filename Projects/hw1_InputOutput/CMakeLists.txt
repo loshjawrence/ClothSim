@@ -8,6 +8,6 @@ if(CREATE_LOCAL_MAKEFILES)
   configure_file(${CISPBA_SOURCE_DIR}/Scripts/Makefile.in ${CMAKE_CURRENT_SOURCE_DIR}/Makefile @ONLY)
 endif()
 
-add_cispba_executable(hw1_InputOutput main.cpp Particles.cpp)
+add_cispba_executable(hw1_InputOutput main.cpp Particles.cpp SegmentMesh.cpp TriangleMesh.cpp)
 target_include_directories(hw1_InputOutput SYSTEM PUBLIC ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(hw1_InputOutput partio eigen)

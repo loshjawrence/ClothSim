@@ -11,7 +11,7 @@ Particles<T, dim>::Particles() : pos() , vel(), mass()
 
 }
 template<class T, int dim>
-Particles<T, dim>::Particles(int N) : pos(N), vel(N), mass(N)
+Particles<T, dim>::Particles(const int N) : pos(N), vel(N), mass(N)
 {
 
 }
@@ -26,6 +26,7 @@ void Particles<T, dim>::RandInit(const T posScale, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] = Matrix<T, dim, 1>::Random() * posScale;
         vel[i] = Matrix<T, dim, 1>::Random() * velScale;
+        vel[i].normalize();//constant speed, random direction
     }
 }
 
@@ -33,7 +34,8 @@ template<class T, int dim>
 void Particles<T, dim>::UpdateRandVel(const T deltaT, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] += vel[i] * deltaT;
-        vel[i] = Matrix<T, dim, 1>::Random() * velScale;
+        vel[i] += Matrix<T, dim, 1>::Random() * velScale;
+        vel[i].normalize();//constant speed, random direction
     }
 }
 

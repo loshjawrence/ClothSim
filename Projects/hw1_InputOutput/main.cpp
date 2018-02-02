@@ -6,7 +6,6 @@ using T = double;
 constexpr int dim = 3;
 
 int main(int argc, char* argv[]) {
-//    std::string file="test.pda";
 //    Particles<T,dim> particles(10);
 //    particles.RandInit(Particles<T, dim>::RAND_POS_SCALE, Particles<T,dim>::RAND_VEL_SCALE);
 
@@ -15,8 +14,7 @@ int main(int argc, char* argv[]) {
 
     SegmentMesh<T, dim> segmentMesh(10);
     segmentMesh.particles.RandInit(Particles<T,dim>::RAND_POS_SCALE, Particles<T,dim>::RAND_VEL_SCALE);
-    segmentMesh.WriteToPoly("FramesOutput/segmentMesh.poly");
-    segmentMesh.particles.WritePartio_RandomFrames("FramesOutput/ParticleFrames/particles");
+    segmentMesh.WritePoly_RandomFrames("FramesOutput/SegmentMeshFrames/segmentMesh");
 
     return 0;
 }

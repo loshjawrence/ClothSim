@@ -22,7 +22,8 @@ public:
     SegmentMesh(const int N);
     ~SegmentMesh();
 
-    void WriteToPoly(const string& polyFileName);
+    void WritePoly_RandomFrames(const string& polyFileName);
+    void WritePoly(const string& polyFileName);
 };
 
 

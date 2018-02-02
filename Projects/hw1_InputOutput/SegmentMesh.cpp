@@ -26,10 +26,20 @@ SegmentMesh<T, dim>::~SegmentMesh()
 }
 
 template<class T, int dim>
-void SegmentMesh<T, dim>::WriteToPoly(const string& polyFileName) {
+void SegmentMesh<T,dim>::WritePoly_RandomFrames(const string& polyFileName) {
+    const int numFrames = 120;
+    const T time_step = 1.0/24.0;
+    for(int i = 1; i <= numFrames; ++i) {
+        WritePoly(polyFileName + to_string(i));
+        particles.UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
+    }
+}
+
+template<class T, int dim>
+void SegmentMesh<T, dim>::WritePoly(const string& polyFileName) {
     //Open the file
     ofstream polyFile;
-    polyFile.open(polyFileName);
+    polyFile.open(polyFileName + ".poly");
 
     //Write the POINTS section
     polyFile << "POINTS\n";

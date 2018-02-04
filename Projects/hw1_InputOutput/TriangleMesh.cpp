@@ -38,9 +38,9 @@ void TriangleMesh<T, dim>::AssignTriangleFanIndices() {
 }
 
 template<class T, int dim>
-void TriangleMesh<T, dim>::WriteObj(const string& filename) {
+void TriangleMesh<T, dim>::WriteObj(const std::string& filename) {
     //Open the file
-    ofstream file;
+    std::ofstream file;
     file.open(filename + ".obj");
 
     //Write the v (vertex) section
@@ -65,11 +65,11 @@ void TriangleMesh<T, dim>::WriteObj(const string& filename) {
 }
 
 template<class T, int dim>
-void TriangleMesh<T, dim>::WriteObj_RandomFrames(const string& objFileName) {
+void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName) {
     const int numFrames = 120;
     const T time_step = 1.0/24.0;
     for(int i = 1; i <= numFrames; ++i) {
-        WriteObj(objFileName + to_string(i));
+        WriteObj(objFileName + std::to_string(i));
         particles.UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
     }
 

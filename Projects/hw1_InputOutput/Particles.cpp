@@ -3,7 +3,9 @@
 //
 
 #include "Particles.h"
-
+#include <iostream>
+#include <sstream>
+#include <fstream>
 
 template<class T, int dim>
 Particles<T, dim>::Particles() : pos() , vel(), mass()
@@ -24,8 +26,8 @@ Particles<T, dim>::~Particles() {
 template<class T, int dim>
 void Particles<T, dim>::RandInit(const T posScale, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
-        pos[i] = Matrix<T, dim, 1>::Random() * posScale;
-        vel[i] = Matrix<T, dim, 1>::Random() * velScale;
+        pos[i] = Eigen::Matrix<T, dim, 1>::Random() * posScale;
+        vel[i] = Eigen::Matrix<T, dim, 1>::Random() * velScale;
         vel[i].normalize();//constant speed, random direction
     }
 }
@@ -34,14 +36,47 @@ template<class T, int dim>
 void Particles<T, dim>::UpdateRandVel(const T deltaT, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] += vel[i] * deltaT;
-        vel[i] += Matrix<T, dim, 1>::Random() * velScale;
+        vel[i] += Eigen::Matrix<T, dim, 1>::Random() * velScale;
         vel[i].normalize();//constant speed, random direction
     }
 }
 
+template<class T, int dim>
+void Particles<T, dim>::WriteForces(const std::string& output) {
+    std::ofstream outputFile;
+    outputFile.open(output);
+    std::stringstream outputLine;
+    for(Eigen::Matrix<T,dim,1>& force : springForce) {
+        outputLine << force;
+    }
+    for(Eigen::Matrix<T,dim,1>& force : dampForce) {
+        outputLine << force;
+    }
+    outputLine << "\n";
+    outputFile << outputLine.rdbuf();
+    outputFile.close();
+}
 
 template<class T, int dim>
-void Particles<T, dim>::WritePartio(const string& particleFile) {
+void Particles<T, dim>::WriteForces(std::ofstream& outputFile) {
+    //outputFile is opened and closed outside of this scope
+    std::stringstream outputLine;
+    for(Eigen::Matrix<T,dim,1>& force : springForce) {
+        for(int i = 0; i < dim; ++i) {
+            outputLine << force[i] << " ";
+        }
+    }
+    for(Eigen::Matrix<T,dim,1>& force : dampForce) {
+        for(int i = 0; i < dim; ++i) {
+            outputLine << force[i] << " ";
+        }
+    }
+    outputLine << "\n";
+    outputFile << outputLine.rdbuf();
+}
+
+template<class T, int dim>
+void Particles<T, dim>::WritePartio(const std::string& particleFile) {
     Partio::ParticlesDataMutable* parts = Partio::create();
     Partio::ParticleAttribute posH, vH, mH;
     mH = parts->addAttribute("m", Partio::VECTOR, 1);
@@ -62,16 +97,16 @@ void Particles<T, dim>::WritePartio(const string& particleFile) {
     }
 
 
-    Partio::write(string(particleFile + ".bgeo").c_str(), *parts);
+    Partio::write(std::string(particleFile + ".bgeo").c_str(), *parts);
     parts->release();
 }
 
 template<class T, int dim>
-void Particles<T, dim>::WritePartio_RandomFrames(const string &particleFile) {
+void Particles<T, dim>::WritePartio_RandomFrames(const std::string &particleFile) {
     const int numFrames = 120;
     const T time_step = 1.0/24.0;
     for(int i = 1; i <= numFrames; ++i) {
-        WritePartio(particleFile + to_string(i));
+        WritePartio(particleFile + std::to_string(i));
         UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
     }
 }

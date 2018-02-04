@@ -15,7 +15,7 @@ public:
 
     //similar to index buffer object in graphics api's,
     //each set of 3 indices is a triangle face
-    vector<u_int32_t> indices;
+    std::vector<u_int32_t> indices;
 
 public:
     TriangleMesh();
@@ -23,8 +23,8 @@ public:
     ~TriangleMesh();
 
     void AssignTriangleFanIndices();
-    void WriteObj(const string& objFileName);
-    void WriteObj_RandomFrames(const string& objFileName);
+    void WriteObj(const std::string& objFileName);
+    void WriteObj_RandomFrames(const std::string& objFileName);
 
 };
 

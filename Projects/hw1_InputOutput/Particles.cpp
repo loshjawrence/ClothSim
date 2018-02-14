@@ -13,7 +13,7 @@ Particles<T, dim>::Particles() : pos() , vel(), mass()
 
 }
 template<class T, int dim>
-Particles<T, dim>::Particles(const int N) : pos(N), vel(N), mass(N)
+Particles<T, dim>::Particles(const int N) : pos(N), vel(N), springForce(N), dampForce(N), mass(N)
 {
 
 }
@@ -24,11 +24,18 @@ Particles<T, dim>::~Particles() {
 }
 
 template<class T, int dim>
-void Particles<T, dim>::RandInit(const T posScale, const T velScale) {
+void Particles<T, dim>::RandInit(const T& posScale, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] = Eigen::Matrix<T, dim, 1>::Random() * posScale;
         vel[i] = Eigen::Matrix<T, dim, 1>::Random() * velScale;
         vel[i].normalize();//constant speed, random direction
+    }
+}
+
+template<class T, int dim>
+void Particles<T, dim>::SaveFixedPositions() {
+    for(u_int32_t i = 0; i < fixed.size(); ++i) {
+        fixedPos.push_back(pos[fixed[i]]);
     }
 }
 
@@ -41,11 +48,39 @@ void Particles<T, dim>::RandInitVel(const T velScale) {
 }
 
 template<class T, int dim>
-void Particles<T, dim>::UpdateRandVel(const T deltaT, const T velScale) {
+void Particles<T, dim>::InitVert(const T& height, const T& spacing) {
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        pos[i].setZero();
+        pos[i][1] = height - i*spacing;
+        vel[i].setZero();
+    }
+}
+
+template<class T, int dim>
+void Particles<T, dim>::UpdateRandVel(const T& deltaT, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] += vel[i] * deltaT;
         vel[i] += Eigen::Matrix<T, dim, 1>::Random() * velScale;
         vel[i].normalize();//constant speed, random direction
+    }
+}
+
+template<class T, int dim>
+void Particles<T, dim>::UpdateFE(const T& dt, const T& m, const T& g) {
+    const T invM = 1.0 / m;
+    Eigen::Matrix<T,dim,1> gravityForce; gravityForce.setZero();
+    gravityForce[1] = m*g;
+
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        pos[i] += dt * vel[i];
+        const Eigen::Matrix<T, dim, 1> f = dampForce[i] + springForce[i] + gravityForce;
+        vel[i] += dt * invM * f;
+    }
+
+    //reset any fixed particles
+    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
+        pos[fixed[i]] = fixedPos[i];
+        vel[fixed[i]].setZero();
     }
 }
 
@@ -120,7 +155,7 @@ void Particles<T, dim>::WritePartio_RandomFrames(const std::string &particleFile
 }
 
 
-template class Particles<float,  2>;
+//template class Particles<float,  2>;
+//template class Particles<double, 2>;
 template class Particles<float,  3>;
-template class Particles<double, 2>;
 template class Particles<double, 3>;

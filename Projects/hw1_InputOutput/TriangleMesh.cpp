@@ -128,14 +128,14 @@ void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices() {
     }
 
 }
-
-template<>
-void TriangleMesh<float, 2>::AssignGridMeshPositionsIndices() {
-}
-
-template<>
-void TriangleMesh<double, 2>::AssignGridMeshPositionsIndices() {
-}
+//
+//template<>
+//void TriangleMesh<float, 2>::AssignGridMeshPositionsIndices() {
+//}
+//
+//template<>
+//void TriangleMesh<double, 2>::AssignGridMeshPositionsIndices() {
+//}
 
 template<class T, int dim>
 void TriangleMesh<T, dim>::AssignSpringArray() {
@@ -245,7 +245,7 @@ void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName)
 }
 
 
-template class TriangleMesh<float,  2>;
+//template class TriangleMesh<float,  2>;
+//template class TriangleMesh<double, 2>;
 template class TriangleMesh<float,  3>;
-template class TriangleMesh<double, 2>;
 template class TriangleMesh<double, 3>;

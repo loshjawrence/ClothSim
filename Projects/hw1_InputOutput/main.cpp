@@ -22,8 +22,13 @@ int main(int argc, char* argv[]) {
 //    TriangleMesh.particles.RandInit(Particles<T,dim>::RAND_POS_SCALE, Particles<T,dim>::RAND_VEL_SCALE);
 //    TriangleMesh.WriteObj_RandomFrames("FramesOutput/TriangleMeshFrames/triangleMesh");
 
+    TriangleMesh<T, dim> TriangleMesh(2,2);
+    TriangleMesh.particles.RandInitVel(Particles<T,dim>::RAND_VEL_SCALE);
+    TriangleMesh.WriteObj_RandomFrames("FramesOutput/TriangleMeshFrames/triangleMesh");
+
 //    hw3Processor("hw3Input/test_input.txt", "hw3Input/mytest_output.txt");
-    hw3Processor("hw3Input/actual_input.txt", "hw3Input/myactual_output.txt");
+//    hw3Processor("hw3Input/actual_input.txt", "hw3Input/myactual_output.txt");
+
 
     return 0;
 }

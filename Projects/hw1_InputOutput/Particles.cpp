@@ -33,6 +33,14 @@ void Particles<T, dim>::RandInit(const T posScale, const T velScale) {
 }
 
 template<class T, int dim>
+void Particles<T, dim>::RandInitVel(const T velScale) {
+    for(u_int32_t i = 0; i < pos.size(); ++i) {
+        vel[i] = Eigen::Matrix<T, dim, 1>::Random() * velScale;
+        vel[i].normalize();//constant speed, random direction
+    }
+}
+
+template<class T, int dim>
 void Particles<T, dim>::UpdateRandVel(const T deltaT, const T velScale) {
     for(u_int32_t i = 0; i < pos.size(); ++i) {
         pos[i] += vel[i] * deltaT;

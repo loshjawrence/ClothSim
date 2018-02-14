@@ -32,6 +32,7 @@ public:
 
 
     void RandInit(const T posScale, const T velScale);
+    void RandInitVel(const T velScale);
     void UpdateRandVel(const T deltaT, const T velScale);
     void WriteForces(const std::string& output);
     void WriteForces(std::ofstream& outputFile);

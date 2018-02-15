@@ -20,15 +20,17 @@ TriangleMesh<T, dim>::TriangleMesh(const int N) : particles(N), indices(3*(N-2))
 
 template<class T, int dim>
 TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
-        particles((X+1)*(Y+1)), indices(3*2*(X*Y)), springs(4*X*Y + X + Y), width(X), height(Y)
+        particles((X+1)*(Y+1)), indices(3*2*(X*Y)), springs(4*X*Y + X + Y), bendSprings((Y+1)*(X-1)+(X+1)*(Y-1)), width(X), height(Y)
 {
     //This constructor assumes a segmented quad sheet (piece of cloth), of X by Y quads
     particles.kHat = 10.0; //1.0
     particles.damp = 1.0; //2.0
+    particles.kHatBend = 10.0; //1.0
+    particles.dampBend = 1.0; //2.0
     L0   = 1.0;   //m 1.0
     L0_d = L0 * sqrt(2.0);//m
     particles.c    = 0.01;   // kg/s 0.01
-    particles.dt   = 0.002; //s 0.002
+    particles.dt   = 0.009; //s 0.002, 0.012
     particles.mass = 0.05;  // kg 0.001
     particles.gravity = -9.81;  //m/s^2
     AssignGridMeshPositionsIndices();
@@ -49,7 +51,8 @@ void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
-            particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, y*L0, 0.0);
+            const Eigen::Matrix<float, 1,1> randZ = Eigen::Matrix<float,1,1>::Random()*0.5;
+            particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, y*L0, randZ[0]);
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
     }
@@ -92,7 +95,8 @@ void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices() {
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
-            particles.pos[x + (width+1)*y] = Eigen::Matrix<double, 3, 1>(x*L0, y*L0, 0.0);
+            const Eigen::Matrix<double, 1,1> randZ = Eigen::Matrix<double,1,1>::Random()*0.5;
+            particles.pos[x + (width+1)*y] = Eigen::Matrix<double, 3, 1>(x*L0, y*L0, randZ[0]);
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
     }
@@ -129,18 +133,11 @@ void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices() {
     }
 
 }
-//
-//template<>
-//void TriangleMesh<float, 2>::AssignGridMeshPositionsIndices() {
-//}
-//
-//template<>
-//void TriangleMesh<double, 2>::AssignGridMeshPositionsIndices() {
-//}
 
 template<class T, int dim>
 void TriangleMesh<T, dim>::AssignSpringArray() {
 
+    //lower left corner is 0,0
     //go by quads, adding bottom, left and cross springs
     //
     //  |*   *
@@ -193,6 +190,29 @@ void TriangleMesh<T, dim>::AssignSpringArray() {
     }
 
 
+    //assign the horizontal bend springs
+    // //(attempts to keep cloth locally flat, pushes adjacent faces away from each other)
+    //they connect every other particle together(0,2), (1,3) etc
+    index = 0;
+    for(int y = 0; y <= height; ++y) {
+        for(int x = 0; x < width-1; ++x) {
+            LL = x + (width+1)*y;
+            LR = LL + 2;
+//            std::cout << "\nhorizBendSpring" << ": " << LL << "," << LR;
+            bendSprings[index++] = std::tuple<uint32_t, uint32_t, T>(LL, LR, 2.0*L0);
+        }
+    }
+    //vertical bend springs
+    for(int x = 0; x <= width; ++x) {
+        for(int y = 0; y < height-1; ++y) {
+            LL = x + (width+1)*y;
+            UL = LL + 2*(width+1);
+//            std::cout << "\nvertiBendSpring" << ": " << LL << "," << UL;
+            bendSprings[index++] = std::tuple<uint32_t, uint32_t, T>(LL, UL, 2.0*L0);
+        }
+    }
+
+
 }
 
 template<class T, int dim>
@@ -235,76 +255,11 @@ void TriangleMesh<T, dim>::WriteObj(const std::string& filename) {
 }
 
 template<class T, int dim>
-void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName, const uint32_t numFrames) {
-    const T time_step = 1.0/24.0;
-    for(uint32_t i = 1; i <= numFrames; ++i) {
-        WriteObj(objFileName + std::to_string(i));
-        particles.UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
-    }
-}
-
-template<class T, int dim>
 void TriangleMesh<T, dim>::Update(const T& frameTime, const uint32_t iter) {
     for(T time = 0.0; time < frameTime; time += particles.dt) {
 //        CalcForces();
 //        particles.UpdateFE(dt, mass, gravity);
-        particles.UpdateFE(springs);
-    }
-}
-
-//template<class T, int dim>
-//void TriangleMesh<T, dim>::CalcForces() {
-//    //zero forces
-//    for(Eigen::Matrix<T,dim,1>& force : particles.springForce) {
-//        force.setZero();
-//    }
-//    for(Eigen::Matrix<T,dim,1>& force : particles.dampForce) {
-//        force.setZero();
-//    }
-//
-//    const T epsilon = 0.0000001;
-//    //loop through connections and sum up damp and spring forces
-//    for(auto& tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
-//        //accumulate damping forces
-//        Eigen::Matrix<T,dim,1> n12 = particles.pos[std::get<0>(tup)] - particles.pos[std::get<1>(tup)];
-//        Eigen::Matrix<T,dim,1> v12 = particles.vel[std::get<0>(tup)] - particles.vel[std::get<1>(tup)];
-//        T l = n12.norm();//length
-//        n12.normalize();//or just divide by l
-//        Eigen::Matrix<T,dim,1> fd1 = -particles.damp * n12.dot(v12) * n12;
-//        fd1 = fd1.norm() < epsilon ? fd1.setZero() : fd1;
-//        particles.dampForce[std::get<0>(tup)] +=  fd1;
-//        particles.dampForce[std::get<1>(tup)] += -fd1;
-//
-//        //accumulate spring force
-//        const T restLen = std::get<2>(tup);
-//        Eigen::Matrix<T,dim,1> fs1 = -particles.kHat * (l/restLen - 1) * n12;
-//        fs1 = fs1.norm() < epsilon ? fs1.setZero() : fs1;
-//        particles.springForce[std::get<0>(tup)]  +=  fs1;
-//        particles.springForce[std::get<1>(tup)]  += -fs1;
-//    }
-//}
-
-
-template<class T, int dim>
-void TriangleMesh<T,dim>::printForcePosVel(std::ofstream& file, const int iter, const T& time) {
-//   https://eigen.tuxfamily.org/dox/structEigen_1_1IOFormat.html
-//    Eigen::IOFormat CleanFmt(4, 0, ", ", "\n", "[", "]");
-
-    file << "\n\niter" << iter << ", time" << time << " : ";
-    for(uint32_t i = 0; i < particles.pos.size(); ++i) {
-        file << "\npos" << i << ": " << particles.pos[i][0] << " " << particles.pos[i][1] << " " << particles.pos[i][2];
-        file << "\nvel" << i << ": " << particles.vel[i][0] << " " << particles.vel[i][1] << " " << particles.vel[i][2];
-    }
-
-    for(uint32_t i = 0; i < springs.size(); ++i) {
-        const uint32_t one = std::get<0>(springs[i]);
-        const uint32_t two = std::get<1>(springs[i]);
-
-        file << "\nspring" << i << "( " << one << ", " << two << " ): "
-             << particles.springForce[i][0] << " " << particles.springForce[i][1] << " " << particles.springForce[i][2];
-
-        file << "\ndamp  "   << i << "( " << one << ", " << two << " ): "
-             << particles.dampForce[i][0]   << " " << particles.dampForce[i][1]   << " " << particles.dampForce[i][2];
+        particles.UpdateFE(springs,bendSprings);
     }
 }
 
@@ -320,12 +275,21 @@ void TriangleMesh<T,dim>::WriteObj_Sim(const std::string& polyFileName, const ui
         WriteObj(polyFileName + itoa);
         particles.WritePartio("FramesOutput/ParticleFrames/particles" + itoa);
         particles.WritePoly("FramesOutput/SegmentMeshFrames/segmentMesh" + itoa, springs);
-//        printForcePosVel(file, i, 0.0);
+//        particles.printForcePosVel(file, i, 0.0,springs);
         Update(frameTime, i);
     }
     file.close();
 }
 
+
+//template<class T, int dim>
+//void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName, const uint32_t numFrames) {
+//    const T time_step = 1.0/24.0;
+//    for(uint32_t i = 1; i <= numFrames; ++i) {
+//        WriteObj(objFileName + std::to_string(i));
+//        particles.UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
+//    }
+//}
 
 //template class TriangleMesh<float,  2>;
 //template class TriangleMesh<double, 2>;

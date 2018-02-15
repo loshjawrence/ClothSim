@@ -29,21 +29,16 @@ public:
     SegmentMesh(const int N);
     ~SegmentMesh();
 
-    void InitFromHW3Line(const std::string& inputLine);
-    void SetConnections_HW3();
 
     void InitVert(const T& height);
 
-    void CalcForces();
     void Update(const T& frameTime, const uint32_t iter);
-    void WriteForces(const std::string& output);
-    void WriteForces(std::ofstream& outputFile);
-    void WritePoly_RandomFrames(const std::string& polyFileName);
-    void printForcePosVel(const int iter, const T& time);
-    void printForces(const int iter, const T& time);
-    void printPosVel(const int iter, const T& time);
     void WritePoly_Sim(const std::string& polyFileName, const uint32_t numFrames);
-    void WritePoly(const std::string& polyFileName);
+//    void InitFromHW3Line(const std::string& inputLine);
+//    void SetConnections_HW3();
+//    void WriteForces(const std::string& output);
+//    void WriteForces(std::ofstream& outputFile);
+//    void WritePoly_RandomFrames(const std::string& polyFileName);
 };
 
 

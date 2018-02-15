@@ -19,12 +19,16 @@ class Particles {
 public:
     std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> pos;
     std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> vel;
-    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> springForce;
-    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> dampForce;
+    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> sprElastForce;
+    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> sprDampForce;
+    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> bendElastForce;
+    std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> bendDampForce;
     std::vector<uint32_t> fixed;
     std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> fixedPos;
     T kHat; //young's modulus, E
     T damp;//damping coefficient, b, gamma
+    T kHatBend; //young's modulus, E
+    T dampBend;//damping coefficient, b, gamma
     T c;
     T dt;
     T gravity;
@@ -45,13 +49,17 @@ public:
     void InitVert(const T& height, const T& spacing);
     void SaveFixedPositions();
     void UpdateRandVel(const T& deltaT, const T velScale);
-    void CalcForces(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
-    void UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
+    void CalcForces(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+                    const std::vector<std::tuple<uint32_t, uint32_t, T>>& bendSprings);
+    void UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+                  const std::vector<std::tuple<uint32_t, uint32_t, T>>& bendSprings);
     void WriteForces(const std::string& output);
     void WriteForces(std::ofstream& outputFile);
 
     void WritePartio(const std::string& particleFile);
     void WritePartio_RandomFrames(const std::string& particleFile);
+    void printForcePosVel(std::ofstream& file, const int iter, const T& time,
+                                            std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
     void WritePoly(const std::string& polyFileName, const std::vector<std::tuple<uint32_t, uint32_t, T>>& indices);
 
 };

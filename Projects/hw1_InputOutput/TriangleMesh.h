@@ -18,6 +18,7 @@ public:
     //each set of 3 indices is a triangle face
     std::vector<uint32_t> indices;
     std::vector<std::tuple<uint32_t, uint32_t, T>> springs;
+    std::vector<std::tuple<uint32_t, uint32_t, T>> bendSprings;
 
     int32_t width; //num quads in x
     int32_t height;//num quads in y

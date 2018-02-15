@@ -11,28 +11,29 @@ TriangleMesh<T,dim>::TriangleMesh() : particles(), indices()
 
 }
 
-
 template<class T, int dim>
 TriangleMesh<T, dim>::TriangleMesh(const int N) : particles(N), indices(3*(N-2))
 {
     //This constructor assumes simple triangle fan construction
     AssignTriangleFanIndices();
 }
+
 template<class T, int dim>
 TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
         particles((X+1)*(Y+1)), indices(3*2*(X*Y)), springs(4*X*Y + X + Y), width(X), height(Y)
 {
     //This constructor assumes a segmented quad sheet (piece of cloth), of X by Y quads
-    mass = 0.001;  // kg
-    kHat = 1.0;
-    c    = 0.01;   // kg/s
-    grav = -9.81;  //m/s^2
-    dt   = 0.002; //s
-    L0   = 1.0;   //m
+    particles.kHat = 10.0; //1.0
+    particles.damp = 1.0; //2.0
+    L0   = 1.0;   //m 1.0
     L0_d = L0 * sqrt(2.0);//m
-    damp = 2.0;
+    particles.c    = 0.01;   // kg/s 0.01
+    particles.dt   = 0.002; //s 0.002
+    particles.mass = 0.05;  // kg 0.001
+    particles.gravity = -9.81;  //m/s^2
     AssignGridMeshPositionsIndices();
     AssignSpringArray();
+    particles.InitVelZero();
 };
 
 template<class T, int dim>
@@ -49,7 +50,7 @@ void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
             particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, y*L0, 0.0);
-            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
+//            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
     }
 
@@ -68,7 +69,7 @@ void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
             second = first + 1;                 //bot right
             third = first + 1 + width;          //top left
 
-            std::cout << "\n\nf: " << first << " s: " << second << " t: " << third;
+//            std::cout << "\n\nf: " << first << " s: " << second << " t: " << third;
             indices[index++] = first;
             indices[index++] = second;
             indices[index++] = third;
@@ -80,7 +81,7 @@ void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
             indices[index++] = first;
             indices[index++] = second;
             indices[index++] = third;
-            std::cout << "\nf: " << first << " s: " << second << " t: " << third;
+//            std::cout << "\nf: " << first << " s: " << second << " t: " << third;
         }
     }
 }
@@ -156,15 +157,15 @@ void TriangleMesh<T, dim>::AssignSpringArray() {
             LR = LL+1;
             UL = LL + width + 1;
             UR = UL + 1;
-            std::cout << "\n\nquad" << index/4;
-            std::cout << "\nbot:"   << LL << "," << LR;
-            std::cout << "\nToUR:"  << LL << "," << UR;
-            std::cout << "\nleft:"  << LL << "," << UL;
-            std::cout << "\nToLR:"  << UL << "," << LR;
-            springs[index++] = std::pair<uint32_t, uint32_t>(LL, LR);   //bottom spring
-            springs[index++] = std::pair<uint32_t, uint32_t>(LL, UR);   //ToUR spring
-            springs[index++] = std::pair<uint32_t, uint32_t>(LL, UL);   //left spring
-            springs[index++] = std::pair<uint32_t, uint32_t>(UL, LR);   //ToLR spring
+//            std::cout << "\n\nquad" << index/4;
+//            std::cout << "\nbot:"   << LL << "," << LR;
+//            std::cout << "\nToUR:"  << LL << "," << UR;
+//            std::cout << "\nleft:"  << LL << "," << UL;
+//            std::cout << "\nToLR:"  << UL << "," << LR;
+            springs[index++] = std::tuple<uint32_t, uint32_t, T>(LL, LR, L0);       //bottom spring
+            springs[index++] = std::tuple<uint32_t, uint32_t, T>(LL, UR, L0_d);     //ToUR spring
+            springs[index++] = std::tuple<uint32_t, uint32_t, T>(LL, UL, L0);       //left spring
+            springs[index++] = std::tuple<uint32_t, uint32_t, T>(UL, LR, L0_d);     //ToLR spring
         }
     }
 
@@ -180,15 +181,15 @@ void TriangleMesh<T, dim>::AssignSpringArray() {
     for(int y = 0; y < height; ++y) {
         LR = (width+1)*y + width;
         UR = LR + width + 1;
-        std::cout << "\nrightedge" << y << ": " << LR << "," << UR;
-        springs[index++] = std::pair<uint32_t, uint32_t>(LR, UR);
+//        std::cout << "\nrightedge" << y << ": " << LR << "," << UR;
+        springs[index++] = std::tuple<uint32_t, uint32_t, T>(LR, UR, L0);
     }
     //top edge
     for(int x = 0; x < width; ++x) {
         UL = (width+1)*height + x;
         UR = UL + 1;
-        std::cout << "\ntopedge" << x << ": " << UL << "," << UR;
-        springs[index++] = std::pair<uint32_t, uint32_t>(UL, UR);
+//        std::cout << "\ntopedge" << x << ": " << UL << "," << UR;
+        springs[index++] = std::tuple<uint32_t, uint32_t, T>(UL, UR, L0);
     }
 
 
@@ -234,14 +235,95 @@ void TriangleMesh<T, dim>::WriteObj(const std::string& filename) {
 }
 
 template<class T, int dim>
-void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName) {
-    const int numFrames = 120;
+void TriangleMesh<T, dim>::WriteObj_RandomFrames(const std::string& objFileName, const uint32_t numFrames) {
     const T time_step = 1.0/24.0;
-    for(int i = 1; i <= numFrames; ++i) {
+    for(uint32_t i = 1; i <= numFrames; ++i) {
         WriteObj(objFileName + std::to_string(i));
         particles.UpdateRandVel(time_step, Particles<T,dim>::RAND_VEL_SCALE);
     }
+}
 
+template<class T, int dim>
+void TriangleMesh<T, dim>::Update(const T& frameTime, const uint32_t iter) {
+    for(T time = 0.0; time < frameTime; time += particles.dt) {
+//        CalcForces();
+//        particles.UpdateFE(dt, mass, gravity);
+        particles.UpdateFE(springs);
+    }
+}
+
+//template<class T, int dim>
+//void TriangleMesh<T, dim>::CalcForces() {
+//    //zero forces
+//    for(Eigen::Matrix<T,dim,1>& force : particles.springForce) {
+//        force.setZero();
+//    }
+//    for(Eigen::Matrix<T,dim,1>& force : particles.dampForce) {
+//        force.setZero();
+//    }
+//
+//    const T epsilon = 0.0000001;
+//    //loop through connections and sum up damp and spring forces
+//    for(auto& tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
+//        //accumulate damping forces
+//        Eigen::Matrix<T,dim,1> n12 = particles.pos[std::get<0>(tup)] - particles.pos[std::get<1>(tup)];
+//        Eigen::Matrix<T,dim,1> v12 = particles.vel[std::get<0>(tup)] - particles.vel[std::get<1>(tup)];
+//        T l = n12.norm();//length
+//        n12.normalize();//or just divide by l
+//        Eigen::Matrix<T,dim,1> fd1 = -particles.damp * n12.dot(v12) * n12;
+//        fd1 = fd1.norm() < epsilon ? fd1.setZero() : fd1;
+//        particles.dampForce[std::get<0>(tup)] +=  fd1;
+//        particles.dampForce[std::get<1>(tup)] += -fd1;
+//
+//        //accumulate spring force
+//        const T restLen = std::get<2>(tup);
+//        Eigen::Matrix<T,dim,1> fs1 = -particles.kHat * (l/restLen - 1) * n12;
+//        fs1 = fs1.norm() < epsilon ? fs1.setZero() : fs1;
+//        particles.springForce[std::get<0>(tup)]  +=  fs1;
+//        particles.springForce[std::get<1>(tup)]  += -fs1;
+//    }
+//}
+
+
+template<class T, int dim>
+void TriangleMesh<T,dim>::printForcePosVel(std::ofstream& file, const int iter, const T& time) {
+//   https://eigen.tuxfamily.org/dox/structEigen_1_1IOFormat.html
+//    Eigen::IOFormat CleanFmt(4, 0, ", ", "\n", "[", "]");
+
+    file << "\n\niter" << iter << ", time" << time << " : ";
+    for(uint32_t i = 0; i < particles.pos.size(); ++i) {
+        file << "\npos" << i << ": " << particles.pos[i][0] << " " << particles.pos[i][1] << " " << particles.pos[i][2];
+        file << "\nvel" << i << ": " << particles.vel[i][0] << " " << particles.vel[i][1] << " " << particles.vel[i][2];
+    }
+
+    for(uint32_t i = 0; i < springs.size(); ++i) {
+        const uint32_t one = std::get<0>(springs[i]);
+        const uint32_t two = std::get<1>(springs[i]);
+
+        file << "\nspring" << i << "( " << one << ", " << two << " ): "
+             << particles.springForce[i][0] << " " << particles.springForce[i][1] << " " << particles.springForce[i][2];
+
+        file << "\ndamp  "   << i << "( " << one << ", " << two << " ): "
+             << particles.dampForce[i][0]   << " " << particles.dampForce[i][1]   << " " << particles.dampForce[i][2];
+    }
+}
+
+template<class T, int dim>
+void TriangleMesh<T,dim>::WriteObj_Sim(const std::string& polyFileName, const uint32_t numFrames) {
+    const T frameTime = 1.f / 24.f;
+    //Open the debug file
+    std::ofstream file;
+    file.open("FramesOutput/Debug/triangle/trimesh");
+
+    for(uint32_t i = 1; i <= numFrames; ++i) {
+        const std::string itoa = std::to_string(i);
+        WriteObj(polyFileName + itoa);
+        particles.WritePartio("FramesOutput/ParticleFrames/particles" + itoa);
+        particles.WritePoly("FramesOutput/SegmentMeshFrames/segmentMesh" + itoa, springs);
+//        printForcePosVel(file, i, 0.0);
+        Update(frameTime, i);
+    }
+    file.close();
 }
 
 

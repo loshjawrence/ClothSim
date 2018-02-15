@@ -15,14 +15,14 @@ public:
 
     //Every adjacent pair in "indices" is a pair of indices in the particles container.
     //A pair of indices represents a single segment
-    std::vector< std::pair<u_int32_t, u_int32_t> > indices;
-    T kHat; //young's modulus, E
-    T damp;//damping coefficient, b, gamma
+    std::vector< std::tuple<uint32_t, uint32_t, T> > indices;
+//    T kHat; //young's modulus, E
+//    T damp;//damping coefficient, b, gamma
     T L0; //spring's rest length
-    T c;
-    T dt;
-    T gravity;
-    T mass;
+//    T c;
+//    T dt;
+//    T gravity;
+//    T mass;
 
 public:
     SegmentMesh();

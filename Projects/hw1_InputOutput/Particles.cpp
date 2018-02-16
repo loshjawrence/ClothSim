@@ -129,7 +129,7 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     //adjust pos,vel based on collisions
     CheckSphere();
     CheckGround();
-    CheckSelf(springs, posOrig, velOrig);
+    CheckSelf(springs);
 
     //not sure about stretch constraints, when top fold flips to other side it bounces back oddly
     //might be better off with stiff k and low mass
@@ -164,17 +164,12 @@ bool Particles<T, dim>::AreNeighbors(const uint32_t j, const uint32_t k,
 }
 
 template<class T, int dim>
-void Particles<T, dim>::CheckSelf(
-        const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
-        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
-        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig
-)
-{
+void Particles<T, dim>::CheckSelf( const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs ) {
     //must set radius based on stretch headRoom
     const T headRoom = Particles<T, dim>::HEADROOM;
-    const T maxStretch = std::get<2>(springs[0]) + headRoom;
-    const T radius = maxStretch * sqrt(2.0) * 0.25 + 0.01;//prevent worst case force field falls through middle of quad
-    const T minDist = 2.0*radius;
+    const T L0_d_MaxStretch = std::get<2>(springs[1]) * (1.0 + headRoom);//NOT A RATIO, ACTUAL dist
+    const T radius = L0_d_MaxStretch * 0.25;//prevent worst case force field falls through middle of quad
+    const T minDist = radius*2.0;
     const uint32_t passes = 1;//adjusting one will affect the others
 
     const uint32_t size = pos.size();
@@ -211,8 +206,8 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
 )
 {
     const T headRoom = Particles<T, dim>::HEADROOM;
-    const T maxStretch = std::get<2>(springs[0]) + headRoom;
-    const T minStretch = std::get<2>(springs[0]) - headRoom;
+    const T maxStretch = 1.0+headRoom;//THIS IS A RATIO
+    const T minStretch = 1.0-headRoom;
     const uint32_t passes = 1;//adjusting one will affect teh others
 
     for(uint32_t i = 0; i < passes; ++i) {
@@ -228,10 +223,14 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minStretch - stretch) * restLen);
                 pos[one] +=  adjustPos;
                 pos[two] += -adjustPos;
+//                vel[one] -= (vel[one].dot(n12)*n12);
+//                vel[two] -= (vel[two].dot(n12)*n12);
             } else if( stretch > maxStretch) {
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(stretch - maxStretch) * restLen);
                 pos[one] += -adjustPos;
                 pos[two] +=  adjustPos;
+//                vel[one] -= (vel[one].dot(n12)*n12);
+//                vel[two] -= (vel[two].dot(n12)*n12);
             }
         }//tup
     }//passes

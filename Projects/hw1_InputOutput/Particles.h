@@ -67,9 +67,7 @@ public:
     bool AreNeighbors(const uint32_t i, const uint32_t j,
                       const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
 
-    void CheckSelf(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
-                   const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
-                   const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
+    void CheckSelf(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
 
 //    void WriteForces(const std::string& output);
 //    void WriteForces(std::ofstream& outputFile);

@@ -29,7 +29,7 @@ TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
     particles.damp = 1.0; //2.0
     particles.kHatBend = 10.0; //1.0
     particles.dampBend = 1.0; //2.0
-    L0   = 1.0;   //m 1.0
+    L0   = 0.07;   //m 1.0//may have to adjust dt when going really low
     L0_d = L0 * sqrt(2.0);//m
     particles.c    = 0.01;   // kg/s 0.01
     particles.dt   = 0.0025; //s 0.002, 0.012, 0.009
@@ -49,11 +49,11 @@ TriangleMesh<T, dim>::~TriangleMesh()
 template<>
 void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
 
-    //vertices
+    //vertice positions
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
-            const Eigen::Matrix<float, 1,1> randZ = Eigen::Matrix<float,1,1>::Random()*0.05;
+            const Eigen::Matrix<float, 1,1> randZ = Eigen::Matrix<float,1,1>::Random()*L0*0.05;
             particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, y*L0, randZ[0]);
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
@@ -97,7 +97,7 @@ void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices() {
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
-            const Eigen::Matrix<double, 1,1> randZ = Eigen::Matrix<double,1,1>::Random()*0.05;
+            const Eigen::Matrix<double, 1,1> randZ = Eigen::Matrix<double,1,1>::Random()*L0*0.05;
             particles.pos[x + (width+1)*y] = Eigen::Matrix<double, 3, 1>(x*L0, y*L0, randZ[0]);
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }

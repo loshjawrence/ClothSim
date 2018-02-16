@@ -124,6 +124,8 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     const T invM = 1.0 / mass;
     Eigen::Matrix<T,dim,1> gravityForce; gravityForce.setZero();
     gravityForce[1] = mass*gravity;
+    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> posOrig = pos;
+    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
     for(uint32_t i = 0; i < pos.size(); ++i) {
         pos[i] += dt * vel[i];
@@ -134,7 +136,61 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
 
     CheckSphere();
     CheckGround();
+//    AdjustFixedPoints();
+
+    //not sure about this, when top fold flips to other side it bounces back oddly
+    //might be better off with stiff k and low mass
+    AdjustForMaxMinStretch(springs, posOrig, velOrig);
     AdjustFixedPoints();
+}
+
+template<class T, int dim>
+void Particles<T, dim>::AdjustForMaxMinStretch(
+        const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
+        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig
+)
+{
+    const T headRoom = 0.1;
+    const T maxStretch = 1.0 + headRoom;
+    const T minStretch = 1.0 - headRoom;
+    const uint32_t passes = 1;//adjusting one will affect teh others
+
+    for(uint32_t i = 0; i < passes; ++i) {
+        for (auto &tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
+            const uint32_t one = std::get<0>(tup);
+            const uint32_t two = std::get<1>(tup);
+            Eigen::Matrix<T, dim, 1> n12 = pos[one] - pos[two];
+            const T l = n12.norm();//length
+            n12.normalize();//or just divide by l
+            const T restLen = std::get<2>(tup);
+            const T stretch = l / restLen;
+            if (stretch < minStretch) {
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minStretch - stretch) * restLen);
+                pos[one] +=  adjustPos;
+                pos[two] += -adjustPos;
+//                const Eigen::Matrix<T, dim, 1> adjustVel = adjustPos / dt;
+//                vel[one] +=  adjustVel;
+//                vel[two] += -adjustVel;
+            } else if( stretch > maxStretch) {
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(stretch - maxStretch) * restLen);
+                pos[one] += -adjustPos;
+                pos[two] +=  adjustPos;
+//                const Eigen::Matrix<T, dim, 1> adjustVel = adjustPos / dt;
+//                vel[one] += -adjustVel;
+//                vel[two] +=  adjustVel;
+            }
+        }//tup
+    }//passes
+
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        //vel that could have been used to get from pre-euler update to this adjusted post euler update
+        const Eigen::Matrix<T, dim, 1> actualVel = (pos[i] - posOrig[i]) / dt;
+        //diff between vel that was used and vel that could have been used
+        const Eigen::Matrix<T, dim, 1> diffVel = velOrig[i] - actualVel;
+        //subtract off the excess from the current vel(post euler update)
+        vel[i] -= diffVel;
+    }
 }
 
 template<class T, int dim>
@@ -166,8 +222,8 @@ void Particles<T, dim>::CheckSphere() {
             //for pos should push slightly beyond closest point on surface
             pos[i] += n12*(epsilon + radius-l);
 
-            //for vel, dot vel with the normal of the point of intersection (or normalized direction to closest point)
-            //this will give a neg value, mult this value with the normal to get penatration vector
+            //for vel, dot vel with the normal of the point of intersection
+            //this will give a neg value, mult this value with the normal to get penetration vector
             //subtract off this portion from the vel (similar to gramschmidt orthonormalization)
             //ensures no vel components below the plane of intersection(glides along surface)
             //vel vector will be shorter, sorta simulates energy loss on impact
@@ -190,7 +246,7 @@ void Particles<T, dim>::CheckGround() {
 
 template<class T, int dim>
 void Particles<T, dim>::AdjustFixedPoints() {
-    //reset any fixed particles
+////    ////reset any fixed particles
 //    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
 //        pos[fixed[i]] = fixedPos[i];
 //        vel[fixed[i]].setZero();
@@ -199,16 +255,17 @@ void Particles<T, dim>::AdjustFixedPoints() {
 //    toggle fixed points back and forth
 //    //set the first time function is called, uninit when program ends
     static T time = 0.0;
-    static const T pi = 3.1415926535;
-    static const T mag = 2.0;
-    static const T freq = 0.3;
-    static const uint32_t comp = 0;
+    const T pi = 3.1415926535;
+    const T mag = 1.9;
+    const T freq = 0.2;
+    const T phase = pi/4.0;
+    const uint32_t comp = 0;
     time += dt;
     for(uint32_t i = 0; i < fixedPos.size(); ++i) {
         pos[fixed[i]] = fixedPos[i];
-        pos[fixed[i]][comp] += mag*sin(2*i+freq*2*pi*time);
+        pos[fixed[i]][comp] += i*mag*sin(phase+freq*2*pi*time) - i*mag;
         vel[fixed[i]].setZero();
-        vel[fixed[i]][comp] = ( pos[fixed[i]][comp] - (fixedPos[i][comp] + mag*sin(2*i+freq*2*pi*(time-dt))) ) / dt;
+        vel[fixed[i]][comp] = ( pos[fixed[i]][comp] - (fixedPos[i][comp] + i*mag*sin(phase+freq*2*pi*(time-dt)) -i*mag) ) / dt;
     }
 }
 

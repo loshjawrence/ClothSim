@@ -58,6 +58,9 @@ public:
     void CheckSphere();
     void CheckGround();
     void AdjustFixedPoints();
+    void AdjustForMaxMinStretch(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
+    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
 
 //    void WriteForces(const std::string& output);
 //    void WriteForces(std::ofstream& outputFile);

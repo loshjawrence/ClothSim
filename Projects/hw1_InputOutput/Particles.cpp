@@ -130,16 +130,66 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
         const Eigen::Matrix<T, dim, 1> f = sprDampForce[i] + sprElastForce[i] +
                                            bendDampForce[i] + bendElastForce[i] + gravityForce;
         vel[i] += dt * invM * f;
+    }
 
-        //ground check
-        if(pos[i][1] < 0.0) {
+    CheckSphere();
+    CheckGround();
+    AdjustFixedPoints();
+}
+
+template<class T, int dim>
+void Particles<T, dim>::CheckSphere() {
+    //move sphere back and forth
+    //set the first time function is called, uninit when program ends
+    static T time = 0.0;
+    const T radius = 2.0;
+    const T epsilon = 0.001;
+    const T pi = 3.1415926535;
+    const T mag = 5.0;
+    const T freq = 0.1;
+    const uint32_t comp = 2;
+    const T phase = pi/4.0;
+    time += dt;
+
+    Eigen::Matrix<T,dim,1> spherePos(5, 5, 0);
+
+    spherePos[comp] = mag*sin(phase+freq*2*pi*time);
+//    Eigen::Matrix<T,dim,1> sphereVel(0,0,0);
+//    const Eigen::Matrix<T,dim,1> spherePosOrig(5, 5, 0);
+//    sphereVel[comp] = ( spherePos[comp] - (spherePosOrig[comp] + mag*sin(phase+freq*2*pi*(time-dt))) ) / dt;
+
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        Eigen::Matrix<T,dim,1> n12 = pos[i] - spherePos;
+        const T l = n12.norm();//length
+        n12.normalize();//or just divide by l
+        if (l < radius) {
+            //for pos should push slightly beyond closest point on surface
+            pos[i] += n12*(epsilon + radius-l);
+
+            //for vel, dot vel with the normal of the point of intersection (or normalized direction to closest point)
+            //this will give a neg value, mult this value with the normal to get penatration vector
+            //subtract off this portion from the vel (similar to gramschmidt orthonormalization)
+            //ensures no vel components below the plane of intersection(glides along surface)
+            //vel vector will be shorter, sorta simulates energy loss on impact
+            vel[i] -= (vel[i].dot(n12)*n12);
+        }
+    }
+}
+
+template<class T, int dim>
+void Particles<T, dim>::CheckGround() {
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        if (pos[i][1] < 0.0) {
             //for vel should subtract off the dot product of the vel vec with the normal of the point of intersection with the object
             //for pos should push slightly beyond closest point on surface
             pos[i][1] = vel[i][1] = 0.00;
         }
-
     }
+}
 
+
+template<class T, int dim>
+void Particles<T, dim>::AdjustFixedPoints() {
     //reset any fixed particles
 //    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
 //        pos[fixed[i]] = fixedPos[i];
@@ -161,6 +211,8 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
         vel[fixed[i]][comp] = ( pos[fixed[i]][comp] - (fixedPos[i][comp] + mag*sin(2*i+freq*2*pi*(time-dt))) ) / dt;
     }
 }
+
+
 template<class T, int dim>
 void Particles<T, dim>::WritePartio(const std::string& particleFile) {
     Partio::ParticlesDataMutable* parts = Partio::create();

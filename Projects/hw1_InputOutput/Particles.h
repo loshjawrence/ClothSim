@@ -42,25 +42,29 @@ public:
     ~Particles();
 
 
-    void RandInit(const T& posScale, const T velScale);
-    void RandInitVel(const T velScale);
     void InitVelZero();
     //initializes the segment in a vertical line up and down, first particle starting at height going down to last particle
     void InitVert(const T& height, const T& spacing);
     void SaveFixedPositions();
-    void UpdateRandVel(const T& deltaT, const T velScale);
     void CalcForces(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
                     const std::vector<std::tuple<uint32_t, uint32_t, T>>& bendSprings);
     void UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
                   const std::vector<std::tuple<uint32_t, uint32_t, T>>& bendSprings);
-    void WriteForces(const std::string& output);
-    void WriteForces(std::ofstream& outputFile);
 
     void WritePartio(const std::string& particleFile);
-    void WritePartio_RandomFrames(const std::string& particleFile);
     void printForcePosVel(std::ofstream& file, const int iter, const T& time,
                                             std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
     void WritePoly(const std::string& polyFileName, const std::vector<std::tuple<uint32_t, uint32_t, T>>& indices);
+    void CheckSphere();
+    void CheckGround();
+    void AdjustFixedPoints();
+
+//    void WriteForces(const std::string& output);
+//    void WriteForces(std::ofstream& outputFile);
+//    void WritePartio_RandomFrames(const std::string& particleFile);
+//    void UpdateRandVel(const T& deltaT, const T velScale);
+//    void RandInit(const T& posScale, const T velScale);
+//    void RandInitVel(const T velScale);
 
 };
 

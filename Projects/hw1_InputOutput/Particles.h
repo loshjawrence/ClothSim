@@ -35,6 +35,7 @@ public:
     T mass;
     static constexpr T RAND_POS_SCALE = 0.5;
     static constexpr T RAND_VEL_SCALE = 0.5;
+    static constexpr T HEADROOM = 0.1;
 
 public:
     Particles();                    //create empty set of particles
@@ -55,12 +56,20 @@ public:
     void printForcePosVel(std::ofstream& file, const int iter, const T& time,
                                             std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
     void WritePoly(const std::string& polyFileName, const std::vector<std::tuple<uint32_t, uint32_t, T>>& indices);
+    void ForwardEuler_explicit();
     void CheckSphere();
     void CheckGround();
     void AdjustFixedPoints();
     void AdjustForMaxMinStretch(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
-    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
-    const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
+                                const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
+                                const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
+
+    bool AreNeighbors(const uint32_t i, const uint32_t j,
+                      const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
+
+    void CheckSelf(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+                   const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
+                   const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
 
 //    void WriteForces(const std::string& output);
 //    void WriteForces(std::ofstream& outputFile);

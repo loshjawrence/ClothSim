@@ -23,6 +23,8 @@ TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
         particles((X+1)*(Y+1)), indices(3*2*(X*Y)), springs(4*X*Y + X + Y), bendSprings((Y+1)*(X-1)+(X+1)*(Y-1)), width(X), height(Y)
 {
     //This constructor assumes a segmented quad sheet (piece of cloth), of X by Y quads
+    //30x30 kHat = 10, L0 = .5, dt = .0005, mass = .005
+    //10x10 kHat = 10, L0 = 1, dt = .0025, mass = .025
     particles.kHat = 10.0; //1.0, 10
     particles.damp = 1.0; //2.0
     particles.kHatBend = 10.0; //1.0
@@ -30,8 +32,8 @@ TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
     L0   = 1.0;   //m 1.0
     L0_d = L0 * sqrt(2.0);//m
     particles.c    = 0.01;   // kg/s 0.01
-    particles.dt   = 0.002; //s 0.002, 0.012, 0.009
-    particles.mass = 0.03;  // kg 0.001, 0.005
+    particles.dt   = 0.0025; //s 0.002, 0.012, 0.009
+    particles.mass = 0.025;  // kg 0.001, 0.005
     particles.gravity = -9.81;  //m/s^2
     AssignGridMeshPositionsIndices();
     AssignSpringArray();

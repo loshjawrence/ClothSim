@@ -121,27 +121,86 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
 
     CalcForces(springs, bendSprings);
 
-    const T invM = 1.0 / mass;
-    Eigen::Matrix<T,dim,1> gravityForce; gravityForce.setZero();
-    gravityForce[1] = mass*gravity;
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> posOrig = pos;
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
-    for(uint32_t i = 0; i < pos.size(); ++i) {
-        pos[i] += dt * vel[i];
-        const Eigen::Matrix<T, dim, 1> f = sprDampForce[i] + sprElastForce[i] +
-                                           bendDampForce[i] + bendElastForce[i] + gravityForce;
-        vel[i] += dt * invM * f;
-    }
+    ForwardEuler_explicit();
 
+    //adjust pos,vel based on collisions
     CheckSphere();
     CheckGround();
-//    AdjustFixedPoints();
+    CheckSelf(springs, posOrig, velOrig);
 
-    //not sure about this, when top fold flips to other side it bounces back oddly
+    //not sure about stretch constraints, when top fold flips to other side it bounces back oddly
     //might be better off with stiff k and low mass
     AdjustForMaxMinStretch(springs, posOrig, velOrig);
-    AdjustFixedPoints();
+//    AdjustFixedPoints();
+}
+
+template<class T, int dim>
+void Particles<T, dim>::ForwardEuler_explicit() {
+    const T invM = 1.0 / mass;
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        pos[i] += dt * vel[i];
+        Eigen::Matrix<T, dim, 1> f = sprDampForce[i] + sprElastForce[i] + bendDampForce[i] + bendElastForce[i];
+        f[1] += mass*gravity;
+        vel[i] += dt * invM * f;
+    }
+}
+
+
+template<class T, int dim>
+bool Particles<T, dim>::AreNeighbors(const uint32_t j, const uint32_t k,
+                  const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs
+)
+{
+    for (auto &tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
+        const uint32_t one = std::get<0>(tup);
+        const uint32_t two = std::get<1>(tup);
+        //this does the same particle check as well
+        if( (j == one || j == two) && (k == one || k == two)) {return true;}
+    }
+    return false;
+}
+
+template<class T, int dim>
+void Particles<T, dim>::CheckSelf(
+        const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
+        const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig
+)
+{
+    //must set radius based on stretch headRoom
+    const T headRoom = Particles<T, dim>::HEADROOM;
+    const T maxStretch = std::get<2>(springs[0]) + headRoom;
+    const T radius = maxStretch * sqrt(2.0) * 0.25 + 0.01;//prevent worst case force field falls through middle of quad
+    const T minDist = 2.0*radius;
+    const uint32_t passes = 1;//adjusting one will affect the others
+
+    const uint32_t size = pos.size();
+    for(uint32_t i = 0; i < passes; ++i) {
+        for(uint32_t j = 0; j < size; ++j) {//the main particle
+            for(uint32_t k = 0; k < size; ++k) {//the one we check against
+                //maybe pass in hash that has particle to adjacent particle list
+//                if(AreNeighbors(j, k, springs)) { continue; }
+                if(j == k) { continue; }//already have the minmaxstretch constraint so no need to ignore neighbors
+
+                //check if sphere fields collide, if so push apart along vec that connects them
+                //subtract off vel component (or zero out?)
+                Eigen::Matrix<T, dim, 1> n12 = pos[j] - pos[k];
+                const T l = n12.norm();//length
+                if(l > minDist) { continue; }
+                n12.normalize();//or just divide by l
+
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minDist - l));
+                pos[j] +=  adjustPos;
+                pos[k] += -adjustPos;
+
+                vel[j] -= (vel[j].dot(n12)*n12);
+                vel[k] -= (vel[k].dot(n12)*n12);//still works out, no need to negate n12
+            }//k
+        }//j
+    }//passes
 }
 
 template<class T, int dim>
@@ -151,9 +210,9 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
         const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig
 )
 {
-    const T headRoom = 0.1;
-    const T maxStretch = 1.0 + headRoom;
-    const T minStretch = 1.0 - headRoom;
+    const T headRoom = Particles<T, dim>::HEADROOM;
+    const T maxStretch = std::get<2>(springs[0]) + headRoom;
+    const T minStretch = std::get<2>(springs[0]) - headRoom;
     const uint32_t passes = 1;//adjusting one will affect teh others
 
     for(uint32_t i = 0; i < passes; ++i) {
@@ -169,16 +228,10 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minStretch - stretch) * restLen);
                 pos[one] +=  adjustPos;
                 pos[two] += -adjustPos;
-//                const Eigen::Matrix<T, dim, 1> adjustVel = adjustPos / dt;
-//                vel[one] +=  adjustVel;
-//                vel[two] += -adjustVel;
             } else if( stretch > maxStretch) {
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(stretch - maxStretch) * restLen);
                 pos[one] += -adjustPos;
                 pos[two] +=  adjustPos;
-//                const Eigen::Matrix<T, dim, 1> adjustVel = adjustPos / dt;
-//                vel[one] += -adjustVel;
-//                vel[two] +=  adjustVel;
             }
         }//tup
     }//passes
@@ -247,26 +300,26 @@ void Particles<T, dim>::CheckGround() {
 template<class T, int dim>
 void Particles<T, dim>::AdjustFixedPoints() {
 ////    ////reset any fixed particles
-//    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
-//        pos[fixed[i]] = fixedPos[i];
-//        vel[fixed[i]].setZero();
-//    }
+    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
+        pos[fixed[i]] = fixedPos[i];
+        vel[fixed[i]].setZero();
+    }
 
 //    toggle fixed points back and forth
 //    //set the first time function is called, uninit when program ends
-    static T time = 0.0;
-    const T pi = 3.1415926535;
-    const T mag = 1.9;
-    const T freq = 0.2;
-    const T phase = pi/4.0;
-    const uint32_t comp = 0;
-    time += dt;
-    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
-        pos[fixed[i]] = fixedPos[i];
-        pos[fixed[i]][comp] += i*mag*sin(phase+freq*2*pi*time) - i*mag;
-        vel[fixed[i]].setZero();
-        vel[fixed[i]][comp] = ( pos[fixed[i]][comp] - (fixedPos[i][comp] + i*mag*sin(phase+freq*2*pi*(time-dt)) -i*mag) ) / dt;
-    }
+//    static T time = 0.0;
+//    const T pi = 3.1415926535;
+//    const T mag = 1.9;
+//    const T freq = 0.2;
+//    const T phase = pi/4.0;
+//    const uint32_t comp = 0;
+//    time += dt;
+//    for(uint32_t i = 0; i < fixedPos.size(); ++i) {
+//        pos[fixed[i]] = fixedPos[i];
+//        pos[fixed[i]][comp] += i*mag*sin(phase+freq*2*pi*time) - i*mag;
+//        vel[fixed[i]].setZero();
+//        vel[fixed[i]][comp] = ( pos[fixed[i]][comp] - (fixedPos[i][comp] + i*mag*sin(phase+freq*2*pi*(time-dt)) -i*mag) ) / dt;
+//    }
 }
 
 

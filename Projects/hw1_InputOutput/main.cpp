@@ -48,18 +48,37 @@ int main(int argc, char* argv[]) {
 //    hw3Processor("hw3Input/actual_input.txt", "hw3Input/myactual_output.txt");
     return 0;
 }
-void WriteObj_Sim() {
-    //make array of cloth
-    const uint32_t size = 10;
-    const uint32_t numTriMeshes = 2;
-    std::vector<TriangleMesh<T, dim>> triMeshes;
-    for (uint32_t i = 0; i < numTriMeshes; ++i) {
-        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T,dim,1>(0,0,i*1.0)));
+
+void SideBySideStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_t size, const uint32_t num) {
+    for (uint32_t i = 0; i < num; ++i) {
+        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, 0, i * 1.0)));
         const uint32_t topleft = (size + 1) * (size);
         const uint32_t topright = topleft + size;
         triMeshes[i].particles.fixed = {topleft, topright};
         triMeshes[i].particles.SaveFixedPositions();
     }
+}
+
+void OneFallOneStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_t size, const uint32_t num) {
+    //the fixed one
+    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, 0, 0)));
+    const uint32_t topleft = (size + 1) * (size);
+    const uint32_t topright = topleft + size;
+    triMeshes[0].particles.fixed = {topleft, topright};
+    triMeshes[0].particles.SaveFixedPositions();
+
+    //the falling one
+    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size+1.0, 0)));
+}
+
+void WriteObj_Sim() {
+    //make array of cloth
+    const uint32_t size = 10;
+    const uint32_t numTriMeshes = 2;
+    std::vector<TriangleMesh<T, dim>> triMeshes;
+
+//    SideBySideStatic(triMeshes,size,numTriMeshes);
+    OneFallOneStatic(triMeshes,size,numTriMeshes);
 
     //Open the debug file
     std::ofstream dbfile; dbfile.open("FramesOutput/Debug/triangle/trimesh");
@@ -92,21 +111,24 @@ void WriteObj_Sim() {
         for(T time = 0.0; time < frameTime; time += dt) {
             globalTime +=dt;
 
-            //update ball
+            //update sphere position
             theSphere.Update(globalTime);
 
-            //update cloth
+            //update each cloth's positions and velocities
             for(uint32_t j = 0; j < numTriMeshes; ++j) {
                 triMeshes[j].particles.UpdateFE(triMeshes[j].springs, triMeshes[j].bendSprings);
             }
 
             //collision checks
+            uint32_t start = -1;
             for(uint32_t j = 0; j < numTriMeshes; ++j) {
+                ++start;//needed to skip already checks pairs of cloth
+
                 //check sphere
                 triMeshes[j].particles.CheckSphere(theSphere.pos, theSphere.radius);
 
                 //check other meshes
-                for (uint32_t k = 0; k < numTriMeshes; ++k) {
+                for (uint32_t k = start; k < numTriMeshes; ++k) {
                     if(j == k) {continue;}
                     triMeshes[j].particles.CheckOtherCloth(triMeshes[k].springs, triMeshes[k].particles);
                 }//k

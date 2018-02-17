@@ -68,7 +68,7 @@ void OneFallOneStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_
     triMeshes[0].particles.SaveFixedPositions();
 
     //the falling one
-    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size+1.0, 0)));
+    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size+3.0, 0)));
 }
 
 void WriteObj_Sim() {
@@ -96,7 +96,7 @@ void WriteObj_Sim() {
             pos[comp] = mag * sin(phase + freq * 2 * pi * globalTime);
         }
     };
-    sphere theSphere = {2.0, Eigen::Matrix<T,dim,1>(5,5,0)};
+    sphere theSphere = {size*0.2, Eigen::Matrix<T,dim,1>(size/2,size/2,0)};
     T globalTime = 0.0;
 
     //setup time vars

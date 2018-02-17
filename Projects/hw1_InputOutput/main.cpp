@@ -51,10 +51,10 @@ int main(int argc, char* argv[]) {
 void WriteObj_Sim() {
     //make array of cloth
     const uint32_t size = 10;
-    const uint32_t numTriMeshes = 1;
+    const uint32_t numTriMeshes = 2;
     std::vector<TriangleMesh<T, dim>> triMeshes;
     for (uint32_t i = 0; i < numTriMeshes; ++i) {
-        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T,dim,1>(0,0,i*1.0)));
+        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T,dim,1>(0,0,i*1.0)));
         const uint32_t topleft = (size + 1) * (size);
         const uint32_t topright = topleft + size;
         triMeshes[i].particles.fixed = {topleft, topright};

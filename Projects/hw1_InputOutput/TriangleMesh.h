@@ -8,6 +8,8 @@
 #include "Particles.h"
 #include <tuple>
 
+enum class ORI {VERT = 0, HORIZ = 1};
+
 template<class T, int dim>
 class TriangleMesh {
 
@@ -35,14 +37,14 @@ public:
 public:
     TriangleMesh();
     TriangleMesh(const int N);
-    TriangleMesh(const int X, const int Y);//cloth, quads X quads
+    TriangleMesh(const int X, const int Y, const ORI ori, const Eigen::Matrix<T, dim,1>& trans);//cloth, quads X quads
     ~TriangleMesh();
 
     void Update(const T& frameTime, const uint32_t iter);
     void printForcePosVel(std::ofstream& file, const int iter, const T& time);
     void CalcForces();
     void AssignTriangleFanIndices();
-    void AssignGridMeshPositionsIndices();
+    void AssignGridMeshPositionsIndices(const ORI ori, const Eigen::Matrix<T, dim, 1>& trans);
     void AssignSpringArray();
     void WriteObj(const std::string& objFileName);
     void WriteObj_RandomFrames(const std::string& objFileName, const uint32_t numFrames);

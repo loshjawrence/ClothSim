@@ -58,17 +58,20 @@ public:
     void WritePoly(const std::string& polyFileName, const std::vector<std::tuple<uint32_t, uint32_t, T>>& indices);
     void ForwardEuler_explicit();
     void CheckSphere();
+    void CheckSphere(const Eigen::Matrix<T,dim,1>& spherePos, const T radius);
     void CheckGround();
     void AdjustFixedPoints();
     void AdjustForMaxMinStretch(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
                                 const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& posOrig,
                                 const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig);
 
-    bool AreNeighbors(const uint32_t i, const uint32_t j,
-                      const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
 
     void CheckSelf(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
 
+    void CheckOtherCloth( const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs, Particles<T,dim>& otherCloth);
+
+//    bool AreNeighbors(const uint32_t i, const uint32_t j,
+//                      const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
 //    void WriteForces(const std::string& output);
 //    void WriteForces(std::ofstream& outputFile);
 //    void WritePartio_RandomFrames(const std::string& particleFile);

@@ -19,7 +19,7 @@ TriangleMesh<T, dim>::TriangleMesh(const int N) : particles(N), indices(3*(N-2))
 }
 
 template<class T, int dim>
-TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
+TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y, const ORI ori, const Eigen::Matrix<T, dim, 1>& trans) :
         particles((X+1)*(Y+1)), indices(3*2*(X*Y)), springs(4*X*Y + X + Y), bendSprings((Y+1)*(X-1)+(X+1)*(Y-1)), width(X), height(Y)
 {
     //This constructor assumes a segmented quad sheet (piece of cloth), of X by Y quads
@@ -29,13 +29,13 @@ TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y) :
     particles.damp = 1.0; //2.0
     particles.kHatBend = 10.0; //1.0
     particles.dampBend = 1.0; //2.0
-    L0   = 0.07;   //m 1.0//may have to adjust dt when going really low
+    L0   = 1.00;   //m 1.0//may have to adjust dt when going really low
     L0_d = L0 * sqrt(2.0);//m
     particles.c    = 0.01;   // kg/s 0.01
     particles.dt   = 0.0025; //s 0.002, 0.012, 0.009
     particles.mass = 0.025;  // kg 0.001, 0.005
     particles.gravity = -9.81;  //m/s^2
-    AssignGridMeshPositionsIndices();
+    AssignGridMeshPositionsIndices(ori, trans);
     AssignSpringArray();
     particles.InitVelZero();
 };
@@ -47,14 +47,16 @@ TriangleMesh<T, dim>::~TriangleMesh()
 }
 
 template<>
-void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
+void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices(const ORI ori, const Eigen::Matrix<float, 3, 1>& trans) {
 
     //vertice positions
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
             const Eigen::Matrix<float, 1,1> randZ = Eigen::Matrix<float,1,1>::Random()*L0*0.05;
-            particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, y*L0, randZ[0]);
+            const float ypos = ori == ORI::VERT ? y*L0     : randZ[0];
+            const float zpos = ori == ORI::VERT ? randZ[0] : y*L0 ;
+            particles.pos[x + (width+1)*y] = Eigen::Matrix<float, 3, 1>(x*L0, ypos, zpos) + trans;
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
     }
@@ -92,13 +94,15 @@ void TriangleMesh<float, 3>::AssignGridMeshPositionsIndices() {
 }
 
 template<>
-void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices() {
+void TriangleMesh<double, 3>::AssignGridMeshPositionsIndices(const ORI ori, const Eigen::Matrix<double, 3, 1>& trans) {
     //vertices
     //Bot Left Corner: 0,0 ; Top Right Corner: width*L0, height*L0
     for (int32_t y = 0; y <= height; ++y) {
         for (int32_t x = 0; x <= width; ++x) {
             const Eigen::Matrix<double, 1,1> randZ = Eigen::Matrix<double,1,1>::Random()*L0*0.05;
-            particles.pos[x + (width+1)*y] = Eigen::Matrix<double, 3, 1>(x*L0, y*L0, randZ[0]);
+            const double ypos = ori == ORI::VERT ? y*L0     : randZ[0];
+            const double zpos = ori == ORI::VERT ? randZ[0] : y*L0 ;
+            particles.pos[x + (width+1)*y] = Eigen::Matrix<double, 3, 1>(x*L0, ypos, zpos) + trans;
 //            std::cout << "\n\nPos(" << x <<"," << y << ") : ( " << x*L0 << ", " << y*L0 << ")";
         }
     }
@@ -259,8 +263,6 @@ void TriangleMesh<T, dim>::WriteObj(const std::string& filename) {
 template<class T, int dim>
 void TriangleMesh<T, dim>::Update(const T& frameTime, const uint32_t iter) {
     for(T time = 0.0; time < frameTime; time += particles.dt) {
-//        CalcForces();
-//        particles.UpdateFE(dt, mass, gravity);
         particles.UpdateFE(springs,bendSprings);
     }
 }

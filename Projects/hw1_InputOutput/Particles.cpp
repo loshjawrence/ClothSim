@@ -127,14 +127,14 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     ForwardEuler_explicit();
 
     //adjust pos,vel based on collisions
-    CheckSphere();
+//    CheckSphere();
     CheckGround();
     CheckSelf(springs);
 
     //not sure about stretch constraints, when top fold flips to other side it bounces back oddly
     //might be better off with stiff k and low mass
     AdjustForMaxMinStretch(springs, posOrig, velOrig);
-//    AdjustFixedPoints();
+    AdjustFixedPoints();
 }
 
 template<class T, int dim>
@@ -148,20 +148,6 @@ void Particles<T, dim>::ForwardEuler_explicit() {
     }
 }
 
-
-template<class T, int dim>
-bool Particles<T, dim>::AreNeighbors(const uint32_t j, const uint32_t k,
-                  const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs
-)
-{
-    for (auto &tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
-        const uint32_t one = std::get<0>(tup);
-        const uint32_t two = std::get<1>(tup);
-        //this does the same particle check as well
-        if( (j == one || j == two) && (k == one || k == two)) {return true;}
-    }
-    return false;
-}
 
 template<class T, int dim>
 void Particles<T, dim>::CheckSelf( const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs ) {
@@ -193,6 +179,41 @@ void Particles<T, dim>::CheckSelf( const std::vector<std::tuple<uint32_t, uint32
 
                 vel[j] -= (vel[j].dot(n12)*n12);
                 vel[k] -= (vel[k].dot(n12)*n12);//still works out, no need to negate n12
+            }//k
+        }//j
+    }//passes
+}
+
+template<class T, int dim>
+void Particles<T, dim>::CheckOtherCloth(
+        const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+        Particles<T,dim>& otherCloth
+)
+{
+    //must set radius based on stretch headRoom
+    const T headRoom = Particles<T, dim>::HEADROOM;
+    const T L0_d_MaxStretch = std::get<2>(springs[1]) * (1.0 + headRoom);//NOT A RATIO, ACTUAL dist
+    const T radius = L0_d_MaxStretch * 0.25;//prevent worst case force field falls through middle of quad
+    const T minDist = radius*2.0;
+    const uint32_t passes = 1;//adjusting one will affect the others
+
+    const uint32_t size = pos.size();
+    for(uint32_t i = 0; i < passes; ++i) {
+        for(uint32_t j = 0; j < size; ++j) {//the main particle
+            for(uint32_t k = 0; k < size; ++k) {//the one in the otherCloth to check against
+                //check if sphere fields collide, if so push apart along vec that connects them
+                //subtract off vel component (or zero out?)
+                Eigen::Matrix<T, dim, 1> n12 = pos[j] - otherCloth.pos[k];
+                const T l = n12.norm();//length
+                if(l > minDist) { continue; }
+                n12.normalize();//or just divide by l
+
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minDist - l));
+                pos[j] +=  adjustPos;
+                otherCloth.pos[k] += -adjustPos;
+
+                vel[j] -= (vel[j].dot(n12)*n12);
+                otherCloth.vel[k] -= (otherCloth.vel[k].dot(n12)*n12);//still works out, no need to negate n12
             }//k
         }//j
     }//passes
@@ -243,6 +264,27 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
         //subtract off the excess from the current vel(post euler update)
         vel[i] -= diffVel;
     }
+}
+
+template<class T, int dim>
+void Particles<T, dim>::CheckSphere(const Eigen::Matrix<T,dim,1>& spherePos, const T radius) {
+    for(uint32_t i = 0; i < pos.size(); ++i) {
+        Eigen::Matrix<T,dim,1> n12 = pos[i] - spherePos;
+        const T l = n12.norm();//length
+        n12.normalize();//or just divide by l
+        if (l < radius) {
+            //for pos should push slightly beyond closest point on surface
+            pos[i] += n12*(0.001 + radius-l);
+
+            //for vel, dot vel with the normal of the point of intersection
+            //this will give a neg value, mult this value with the normal to get penetration vector
+            //subtract off this portion from the vel (similar to gramschmidt orthonormalization)
+            //ensures no vel components below the plane of intersection(glides along surface)
+            //vel vector will be shorter, sorta simulates energy loss on impact
+            vel[i] -= (vel[i].dot(n12)*n12);
+        }
+    }
+
 }
 
 template<class T, int dim>
@@ -409,6 +451,21 @@ void Particles<T, dim>::WritePoly(const std::string& polyFileName,
     polyFile << "END";
     polyFile.close();
 }
+
+//template<class T, int dim>
+//bool Particles<T, dim>::AreNeighbors(const uint32_t j, const uint32_t k,
+//                  const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs
+//)
+//{
+//    for (auto &tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
+//        const uint32_t one = std::get<0>(tup);
+//        const uint32_t two = std::get<1>(tup);
+//        //this does the same particle check as well
+//        if( (j == one || j == two) && (k == one || k == two)) {return true;}
+//    }
+//    return false;
+//}
+
 //
 //template<class T, int dim>
 //void Particles<T, dim>::WriteForces(const std::string& output) {

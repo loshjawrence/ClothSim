@@ -6,6 +6,8 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <Eigen/IterativeLinearSolvers>
+#include <unsupported/Eigen/IterativeSolvers>//MINRES
 
 template<class T, int dim>
 Particles<T, dim>::Particles() : pos() , vel()
@@ -125,6 +127,7 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
     ForwardEuler_explicit();
+//    BackwardEuler_implicit(springs);
 
     //adjust pos,vel based on collisions
 //    CheckSphere();
@@ -137,6 +140,95 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     AdjustFixedPoints();
 }
 
+
+template<>
+void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, float>>& springs) {
+    //build rhs[3nx1], init to 0
+    //Terms for rhs: M*V@n, M*g, F_elastic@x@n
+    using T = float;
+    const uint32_t dim = 3;
+    const uint32_t numParticles = pos.size();
+    const T invdt = 1.0 / dt;
+    const T invdtdt = invdt*invdt;
+
+    //mass*gravity vec
+    Eigen::Matrix<T, dim, 1> mg; mg.setZero(); mg[1] = mass*gravity;
+
+    //rhs vec
+//    Eigen::Matrix<T, dim*numParticles, 1> rhs; rhs.setZero();
+    Eigen::MatrixXf rhs(dim*numParticles,1); rhs.setZero();
+    for(uint32_t i = 0; i < numParticles; ++i) {
+        const Eigen::Matrix<T, dim, 1> sum = invdt * mass * vel[i] + mg + sprElastForce[i];
+        for(uint32_t j = 0; j < dim; ++j) {//populate elem by elem
+            rhs(dim*i+j,1)= sum(j,1);
+        }
+    }
+
+    //NOTE: FULL equation that minres is solving Ax = b, where A is A, b is the rhs var and x is sigma_x in the notes
+    // A * sigma_x = rhs:
+    //(1/dt^2)*M -(1/dt)*G - K) * sigma_x = 1/(dt)*M*v@n + (M*g + F_elast@x@n)
+
+    //Build SPmat A[3nx3n], init to 0, each 3x3 chunk represents and i<-->j spring interaction/entry
+    Eigen::SparseMatrix<T> A(dim*numParticles, dim*numParticles); A.setIdentity();
+
+    //add M terms to A(each entry diagonal of 3x3 chunk is the mass*(1/dt^2)), only entries i<-->j are populated where i==j (the main diag)
+    A *= mass*invdtdt;
+
+    //add G terms to A(four 3x3 entries for interaction between i<-->j equal b*n*nT, also i,i and j,j chunks are negative
+    //b is the damp coeff. n*nT will result in 3x3 matrix(3x1 vec mult by 1x3 vec). must be mult by -(1/dt)*damp.
+    //add K terms to A(four 3x3 entries similar to G (i,i and j,j entries are negative) but the 3x3 chunk(k_s) is defined:
+    //k_s = E*(1/L0 - 1/L)(I - n*nT) + n*nT*E/L0; where E is youngs modulus, I is 3x3 identity L0 is rest length for
+    //spring between nodes i and j, L is the distance between nodes i and j. n*nT will result in 3x3 matrix(3x1 vec mult by 1x3 vec
+    Eigen::Matrix<T, dim, dim> I; I.setIdentity();
+    for(auto& spring : springs) {
+        const uint32_t one  = std::get<0>(spring);
+        const uint32_t two  = std::get<1>(spring);
+        const T restLen     = std::get<2>(spring);
+        const T E_over_L0 = kHat / restLen;
+
+        Eigen::Matrix<T, dim, 1> n12 = pos[one] - pos[two];
+        const T E_over_L = kHat / n12.norm();
+        n12.normalize();
+
+        const Eigen::Matrix<T, dim, dim> nnT = n12 * n12.transpose();
+        const Eigen::Matrix<T, dim, dim> G = -invdt * damp * nnT;
+        const Eigen::Matrix<T, dim, dim> K = -1.0 * ((E_over_L0 - E_over_L)*(I - nnT) + (E_over_L0*nnT));
+        const Eigen::Matrix<T, dim, dim> GplusK = G + K;
+
+        //update the four 3x3 chunks of A with G and K
+        for(uint32_t i = one; i <= two; i += two-one) {//row
+            for(uint32_t j = one; j <two; j += two-one) {//col
+                //update A elem by elem
+                for(uint32_t row = 0; row < dim; ++row) {
+                    for(uint32_t col = 0; col < dim; ++col) {
+                        //probably best to build a list of 'triplets' and use setFromTriplets(iterBegin,iterEnd)
+                        A.coeffRef(i*dim+row, j*dim+col) = GplusK(row,col);
+                    }//col
+                }//row
+            }//j
+        }//i
+
+    }
+
+
+    //call sigma_x = MINRES(A,rhs);// sigma_x is 3nx1
+    //x@n+1 = x@n + sigma_x;
+    //v@n+1 = sigma_x / dt;
+    Eigen::MINRES< Eigen::SparseMatrix<T> > mr(A);
+    const Eigen::MatrixXf sigma_x = mr.solve(rhs);
+    for(uint32_t i = 0; i < numParticles; ++i) {
+        Eigen::Matrix<T, dim, 1> sigma_x_respective;
+        for(uint32_t k = 0; k < dim; ++k) { sigma_x_respective(i,1) = sigma_x(i*dim+k,1); }
+        pos[i] += sigma_x_respective;
+        vel[i] = sigma_x_respective * invdt;
+    }
+}
+
+
+template<>
+void Particles<double, 3>::BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, double>>& springs) {
+}
+
 template<class T, int dim>
 void Particles<T, dim>::ForwardEuler_explicit() {
     const T invM = 1.0 / mass;
@@ -147,6 +239,7 @@ void Particles<T, dim>::ForwardEuler_explicit() {
         vel[i] += dt * invM * f;
     }
 }
+
 
 
 template<class T, int dim>

@@ -127,10 +127,9 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
 //    ForwardEuler_explicit();
-    BackwardEuler_implicit(springs);
+    BackwardEuler_implicit(springs,bendSprings);
 
     //adjust pos,vel based on collisions
-//    CheckSphere();
     CheckGround();
     CheckSelf(springs);
 
@@ -140,9 +139,19 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     AdjustFixedPoints();
 }
 
+void print3x3Mat(const Eigen::Matrix<float, 3, 3>& mat, const std::string& descr) {
+    std::cout << "\n\n" << descr << ":\n" << mat << "\n-----------------------";
+}
+void printSparseMat(const Eigen::SparseMatrix<float>& mat, const std::string& descr) {
+    Eigen::IOFormat CleanFmt(6, 0, ", ", "\n", "[", "]");
+    std::cout << "\n\n" << descr << ":\n" << Eigen::MatrixXf(mat).format(CleanFmt) << "\n-----------------------";
+}
 
 template<>
-void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, float>>& springs) {
+void Particles<float, 3>::BackwardEuler_implicit(
+        const std::vector<std::tuple<uint32_t, uint32_t, float>>& springs,
+        const std::vector<std::tuple<uint32_t, uint32_t, float>>& bendSprings
+) {
     //build rhs[3nx1], init to 0
     //Terms for rhs: M*V@n, M*g, F_elastic@x@n
     using T = float;
@@ -157,7 +166,7 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
     //rhs vec
     Eigen::MatrixXf rhs(dim*numParticles,1); rhs.setZero();
     for(uint32_t i = 0; i < numParticles; ++i) {
-        const Eigen::Matrix<T, dim, 1> sum = invdt * mass * vel[i] + mg + sprElastForce[i];
+        const Eigen::Matrix<T, dim, 1> sum = invdt * mass * vel[i] + mg + sprElastForce[i] + bendElastForce[i];
         for(uint32_t j = 0; j < dim; ++j) {//populate elem by elem
             rhs(dim*i+j)= sum(j);
         }
@@ -180,8 +189,15 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
     //spring between nodes i and j, L is the distance between nodes i and j. n*nT will result in 3x3 matrix(3x1 vec mult by 1x3 vec
     Eigen::Matrix<T, dim, dim> I; I.setIdentity();
     for(auto& spring : springs) {
-        const uint32_t one  = std::get<0>(spring);
-        const uint32_t two  = std::get<1>(spring);
+        //one needs to be < two for A update loop to work
+        uint32_t one  = std::get<0>(spring);
+        uint32_t two  = std::get<1>(spring);
+        if(one > two) {
+            const uint32_t tmp = one;
+            one = two;
+            two = tmp;
+        }
+
         const T restLen     = std::get<2>(spring);
         const T E_over_L0 = kHat / restLen;
 
@@ -196,18 +212,58 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
 
         //update the four 3x3 chunks of A with G and K
         for(uint32_t i = one; i <= two; i += two-one) {//row
-            for(uint32_t j = one; j <two; j += two-one) {//col
+            for(uint32_t j = one; j <=two; j += two-one) {//col
                 //update A elem by elem
+                const T factor = i == j ? -1.0 : 1.0;//3x3 chunks on the diag are negative
                 for(uint32_t row = 0; row < dim; ++row) {
                     for(uint32_t col = 0; col < dim; ++col) {
                         //probably best to build a list of 'triplets' and use setFromTriplets(iterBegin,iterEnd)
                         //where a triplet is a tuple<uint32_t, uint32_t, T> : row,col,value
-                        A.coeffRef(i*dim+row, j*dim+col) = GplusK(row,col);
+                        A.coeffRef(i*dim+row, j*dim+col) += factor * GplusK(row,col);
                     }//col
                 }//row
             }//j
         }//i
+//        printSparseMat(A, "A afer " + std::to_string(one) + "," + std::to_string(two));
 
+    }//springs
+
+    for(auto& spring : bendSprings) {
+        //one needs to be < two for A update loop to work
+        uint32_t one  = std::get<0>(spring);
+        uint32_t two  = std::get<1>(spring);
+        if(one > two) {
+            const uint32_t tmp = one;
+            one = two;
+            two = tmp;
+        }
+
+        const T restLen     = std::get<2>(spring);
+        const T E_over_L0 = kHatBend / restLen;
+
+        Eigen::Matrix<T, dim, 1> n12 = pos[one] - pos[two];
+        const T E_over_L = kHatBend / n12.norm();
+        n12.normalize();
+
+        const Eigen::Matrix<T, dim, dim> nnT = n12 * n12.transpose();
+        const Eigen::Matrix<T, dim, dim> G = -invdt * dampBend * nnT;
+        const Eigen::Matrix<T, dim, dim> K = -1.0 * ((E_over_L0 - E_over_L)*(I - nnT) + (E_over_L0*nnT));
+        const Eigen::Matrix<T, dim, dim> GplusK = G + K;
+
+        //update the four 3x3 chunks of A with G and K
+        for(uint32_t i = one; i <= two; i += two-one) {//row
+            for(uint32_t j = one; j <=two; j += two-one) {//col
+                //update A elem by elem
+                const T factor = i == j ? -1.0 : 1.0;//3x3 chunks on the diag are negative
+                for(uint32_t row = 0; row < dim; ++row) {
+                    for(uint32_t col = 0; col < dim; ++col) {
+                        //probably best to build a list of 'triplets' and use setFromTriplets(iterBegin,iterEnd)
+                        //where a triplet is a tuple<uint32_t, uint32_t, T> : row,col,value
+                        A.coeffRef(i*dim+row, j*dim+col) += factor * GplusK(row,col);
+                    }//col
+                }//row
+            }//j
+        }//i
     }//spring
 
 
@@ -226,7 +282,11 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
 
 
 template<>
-void Particles<double, 3>::BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, double>>& springs) {
+void Particles<double, 3>::BackwardEuler_implicit(
+        const std::vector<std::tuple<uint32_t, uint32_t, double>>& springs,
+        const std::vector<std::tuple<uint32_t, uint32_t, double>>& bendSprings
+)
+{
 }
 
 template<class T, int dim>

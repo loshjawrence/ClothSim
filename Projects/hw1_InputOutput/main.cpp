@@ -68,7 +68,7 @@ void OneFallOneStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_
     triMeshes[0].particles.SaveFixedPositions();
 
     //the falling one
-    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size+3.0, 0)));
+    if(num > 1) { triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size + 3.0, 0))); }
 }
 
 void WriteObj_Sim() {

@@ -57,7 +57,8 @@ public:
                                             std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
     void WritePoly(const std::string& polyFileName, const std::vector<std::tuple<uint32_t, uint32_t, T>>& indices);
     void ForwardEuler_explicit();
-    void BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs);
+    void BackwardEuler_implicit(const std::vector<std::tuple<uint32_t, uint32_t, T>>& springs,
+                                const std::vector<std::tuple<uint32_t, uint32_t, T>>& bendSprings);
     void CheckSphere();
     void CheckSphere(const Eigen::Matrix<T,dim,1>& spherePos, const T radius);
     void CheckGround();

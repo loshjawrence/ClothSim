@@ -126,8 +126,8 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> posOrig = pos;
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
-    ForwardEuler_explicit();
-//    BackwardEuler_implicit(springs);
+//    ForwardEuler_explicit();
+    BackwardEuler_implicit(springs);
 
     //adjust pos,vel based on collisions
 //    CheckSphere();
@@ -152,15 +152,14 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
     const T invdtdt = invdt*invdt;
 
     //mass*gravity vec
-    Eigen::Matrix<T, dim, 1> mg; mg.setZero(); mg[1] = mass*gravity;
+    Eigen::Matrix<T, dim, 1> mg; mg.setZero(); mg(1) = mass*gravity;
 
     //rhs vec
-//    Eigen::Matrix<T, dim*numParticles, 1> rhs; rhs.setZero();
     Eigen::MatrixXf rhs(dim*numParticles,1); rhs.setZero();
     for(uint32_t i = 0; i < numParticles; ++i) {
         const Eigen::Matrix<T, dim, 1> sum = invdt * mass * vel[i] + mg + sprElastForce[i];
         for(uint32_t j = 0; j < dim; ++j) {//populate elem by elem
-            rhs(dim*i+j,1)= sum(j,1);
+            rhs(dim*i+j)= sum(j);
         }
     }
 
@@ -202,13 +201,14 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
                 for(uint32_t row = 0; row < dim; ++row) {
                     for(uint32_t col = 0; col < dim; ++col) {
                         //probably best to build a list of 'triplets' and use setFromTriplets(iterBegin,iterEnd)
+                        //where a triplet is a tuple<uint32_t, uint32_t, T> : row,col,value
                         A.coeffRef(i*dim+row, j*dim+col) = GplusK(row,col);
                     }//col
                 }//row
             }//j
         }//i
 
-    }
+    }//spring
 
 
     //call sigma_x = MINRES(A,rhs);// sigma_x is 3nx1
@@ -218,7 +218,7 @@ void Particles<float, 3>::BackwardEuler_implicit(const std::vector<std::tuple<ui
     const Eigen::MatrixXf sigma_x = mr.solve(rhs);
     for(uint32_t i = 0; i < numParticles; ++i) {
         Eigen::Matrix<T, dim, 1> sigma_x_respective;
-        for(uint32_t k = 0; k < dim; ++k) { sigma_x_respective(i,1) = sigma_x(i*dim+k,1); }
+        for(uint32_t k = 0; k < dim; ++k) { sigma_x_respective(k) = sigma_x(i*dim+k); }
         pos[i] += sigma_x_respective;
         vel[i] = sigma_x_respective * invdt;
     }

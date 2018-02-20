@@ -31,8 +31,7 @@ TriangleMesh<T, dim>::TriangleMesh(const int X, const int Y, const ORI ori, cons
     particles.dampBend = 1.0; //2.0
     L0   = 1.00;   //m 1.0//may have to adjust dt when going really low
     L0_d = L0 * sqrt(2.0);//m
-    particles.c    = 0.01;   // kg/s 0.01
-    particles.dt   = 0.0025; //s 0.002, 0.012, 0.009
+    particles.dt   = 0.0025; //s 0.002, 0.012, 0.009, .0208BE
     particles.mass = 0.025;  // kg 0.001, 0.005
     particles.gravity = -9.81;  //m/s^2
     AssignGridMeshPositionsIndices(ori, trans);

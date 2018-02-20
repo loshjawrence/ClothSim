@@ -19,7 +19,6 @@ SegmentMesh<T, dim>::SegmentMesh(const int N) : particles(N), indices(N-1)
     particles.kHat = 20.0; //1.0
     particles.damp = 1.0; //2.0
     L0   = 1.0;   //m 1.0
-    particles.c    = 0.01;   // kg/s 0.01
     particles.dt   = 0.002; //s 0.002
     particles.mass = 0.3;  // kg 0.001
     particles.gravity = -9.81;  //m/s^2

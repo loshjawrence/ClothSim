@@ -126,8 +126,8 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> posOrig = pos;
     const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>> velOrig = vel;
 
-//    ForwardEuler_explicit();
-    BackwardEuler_implicit(springs,bendSprings);
+    ForwardEuler_explicit();
+//    BackwardEuler_implicit(springs,bendSprings);
 
     //adjust pos,vel based on collisions
     CheckGround();
@@ -384,6 +384,10 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
     const T minStretch = 1.0-headRoom;
     const uint32_t passes = 1;//adjusting one will affect teh others
 
+    //was added in each of the stretch if statements but has issues
+//                vel[one] -= (vel[one].dot(n12)*n12);//HAS BAD ARTIFACTS, PROBABLY OVER CORRECTS (MANY SPRINGS ATTACHED TO PARTICLE)
+//                vel[two] -= (vel[two].dot(n12)*n12);
+
     for(uint32_t i = 0; i < passes; ++i) {
         for (auto &tup: springs) {//0: first particle index, 1: second particle index, 2: rest length
             const uint32_t one = std::get<0>(tup);
@@ -397,14 +401,30 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minStretch - stretch) * restLen);
                 pos[one] +=  adjustPos;
                 pos[two] += -adjustPos;
-//                vel[one] -= (vel[one].dot(n12)*n12);
-//                vel[two] -= (vel[two].dot(n12)*n12);
+
+//                //vel that could have been used to get from pre-euler update to this adjusted post euler update
+//                Eigen::Matrix<T, dim, 1> actualVel = (pos[one] - posOrig[one]) / dt;
+//                //diff between vel that was used and vel that could have been used
+//                Eigen::Matrix<T, dim, 1> diffVel = velOrig[one] - actualVel;
+//                //subtract off the excess from the current vel(post euler update)
+//                vel[one] -= diffVel;
+//                actualVel = (pos[two] - posOrig[two]) / dt;
+//                diffVel = velOrig[two] - actualVel;
+//                vel[two] -= diffVel;
             } else if( stretch > maxStretch) {
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(stretch - maxStretch) * restLen);
                 pos[one] += -adjustPos;
                 pos[two] +=  adjustPos;
-//                vel[one] -= (vel[one].dot(n12)*n12);
-//                vel[two] -= (vel[two].dot(n12)*n12);
+
+//                //vel that could have been used to get from pre-euler update to this adjusted post euler update
+//                Eigen::Matrix<T, dim, 1> actualVel = (pos[one] - posOrig[one]) / dt;
+//                //diff between vel that was used and vel that could have been used
+//                Eigen::Matrix<T, dim, 1> diffVel = velOrig[one] - actualVel;
+//                //subtract off the excess from the current vel(post euler update)
+//                vel[one] -= diffVel;
+//                actualVel = (pos[two] - posOrig[two]) / dt;
+//                diffVel = velOrig[two] - actualVel;
+//                vel[two] -= diffVel;
             }
         }//tup
     }//passes

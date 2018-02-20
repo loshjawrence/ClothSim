@@ -29,7 +29,6 @@ public:
     T damp;//damping coefficient, b, gamma
     T kHatBend; //young's modulus, E
     T dampBend;//damping coefficient, b, gamma
-    T c;
     T dt;
     T gravity;
     T mass;

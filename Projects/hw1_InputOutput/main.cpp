@@ -3,6 +3,8 @@
 #include "TriangleMesh.h"
 #include <iostream>
 #include <fstream>
+#include <chrono>
+using Clock = std::chrono::high_resolution_clock;
 
 using T = float;
 constexpr int dim = 3;
@@ -34,7 +36,15 @@ int main(int argc, char* argv[]) {
 //    triangleMesh.WriteObj_Sim("FramesOutput/TriangleMeshFrames/triangleMesh", 240);
 
     //
+    auto t1 = Clock::now();
+
     WriteObj_Sim();
+
+    auto t2 = Clock::now();
+    std::cout << "TotalTime: "
+              << std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count() * 0.001
+              << " seconds" << std::endl;
+
 
     //JIGGLY SINGLE LINK SPRING
 //    SegmentMesh<T, dim> segmentMesh(10);
@@ -47,6 +57,10 @@ int main(int argc, char* argv[]) {
 //    hw3Processor("hw3Input/test_input.txt", "hw3Input/mytest_output.txt");
 //    hw3Processor("hw3Input/actual_input.txt", "hw3Input/myactual_output.txt");
     return 0;
+}
+
+void OneFallHoriz(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_t size, const uint32_t num) {
+    triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T, dim, 1>(0, (size + 3.0), 0)));
 }
 
 void SideBySideStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_t size, const uint32_t num) {
@@ -67,18 +81,23 @@ void OneFallOneStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_
     triMeshes[0].particles.fixed = {topleft, topright};
     triMeshes[0].particles.SaveFixedPositions();
 
+    const T L0 = triMeshes[0].L0;
     //the falling one
-    if(num > 1) { triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, size + 3.0, 0))); }
+    for(uint32_t i = 1; i < num; ++i) {
+        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T, dim, 1>(0, L0 * i * size*0.2 * (size + 3.0), -L0*size)));
+//        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, L0 * i *  (size + 3.0), 0)));
+    }
 }
 
 void WriteObj_Sim() {
     //make array of cloth
-    const uint32_t size = 10;
+    const uint32_t size = 20;
     const uint32_t numTriMeshes = 2;
     std::vector<TriangleMesh<T, dim>> triMeshes;
 
 //    SideBySideStatic(triMeshes,size,numTriMeshes);
-    OneFallOneStatic(triMeshes,size,numTriMeshes);
+//    OneFallHoriz(triMeshes,size,numTriMeshes);
+    OneFallOneStatic(triMeshes, size, numTriMeshes);
 
     //Open the debug file
     std::ofstream dbfile; dbfile.open("FramesOutput/Debug/triangle/trimesh");
@@ -87,16 +106,20 @@ void WriteObj_Sim() {
     struct sphere {
         T radius;
         Eigen::Matrix<T,dim,1> pos;
+        T mag;
         void Update(const T globalTime) {
             const T pi = 3.1415926535;
-            const T mag = 5.0;
-            const T freq = 0.1;
+            const T freq = 0.2;
             const uint32_t comp = 2;
             const T phase = pi / 4.0;
             pos[comp] = mag * sin(phase + freq * 2 * pi * globalTime);
         }
     };
-    sphere theSphere = {size*0.2, Eigen::Matrix<T,dim,1>(size/2,size/2,0)};
+
+    const T sphStart = triMeshes[0].L0 * size * 0.5;
+    const T rad = triMeshes[0].L0*size*0.2;
+    const T mag = 1.5*rad;
+    sphere theSphere = {rad, Eigen::Matrix<T,dim,1>(sphStart,sphStart,0), mag};
     T globalTime = 0.0;
 
     //setup time vars

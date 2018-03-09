@@ -84,14 +84,15 @@ void OneFallOneStatic(std::vector<TriangleMesh<T,dim>>& triMeshes, const uint32_
     const T L0 = triMeshes[0].L0;
     //the falling one
     for(uint32_t i = 1; i < num; ++i) {
-        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T, dim, 1>(0, L0 * i * size*0.2 * (size + 3.0), -L0*size)));
-//        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, L0 * i *  (size + 3.0), 0)));
+//        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T, dim, 1>(0, L0 * i * size*0.2 * (size + 3.0), -L0*size)));
+        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::HORIZ, Eigen::Matrix<T, dim, 1>(0, L0 * i * size*1.1, -L0*size)));
+//        triMeshes.emplace_back(TriangleMesh<T, dim>(size, size, ORI::VERT, Eigen::Matrix<T, dim, 1>(0, L0 * i *  (size + 1.0), 0)));
     }
 }
 
 void WriteObj_Sim() {
     //make array of cloth
-    const uint32_t size = 20;
+    const uint32_t size = 60;
     const uint32_t numTriMeshes = 2;
     std::vector<TriangleMesh<T, dim>> triMeshes;
 
@@ -109,9 +110,10 @@ void WriteObj_Sim() {
         T mag;
         void Update(const T globalTime) {
             const T pi = 3.1415926535;
-            const T freq = 0.2;
+            const T freq = 0.1;
             const uint32_t comp = 2;
-            const T phase = pi / 4.0;
+//            const T phase = pi / 4.0;
+            const T phase = pi * 3.0 / 4.0;
             pos[comp] = mag * sin(phase + freq * 2 * pi * globalTime);
         }
     };
@@ -125,8 +127,9 @@ void WriteObj_Sim() {
     //setup time vars
     const T dt = triMeshes[0].particles.dt;
     const T frameTime = 1.0/24.0;
+    const uint32_t numFrames = 240;
 
-    for(uint32_t frame = 1; frame <= 240; ++frame) {
+    for(uint32_t frame = 1; frame <= numFrames; ++frame) {
 
         WriteFrame(triMeshes, frame, dbfile);
 

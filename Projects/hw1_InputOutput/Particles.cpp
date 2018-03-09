@@ -129,19 +129,19 @@ void Particles<T, dim>::UpdateFE(const std::vector<std::tuple<uint32_t, uint32_t
     ForwardEuler_explicit();
 //    BackwardEuler_implicit(springs,bendSprings);
 
-    //adjust pos,vel based on collisions
-    CheckGround();
     CheckSelf(springs);
 
     //not sure about stretch constraints, when top fold flips to other side it bounces back oddly
     //might be better off with stiff k and low mass
     AdjustForMaxMinStretch(springs, posOrig, velOrig);
+    CheckGround();
     AdjustFixedPoints();
 }
 
 void print3x3Mat(const Eigen::Matrix<float, 3, 3>& mat, const std::string& descr) {
     std::cout << "\n\n" << descr << ":\n" << mat << "\n-----------------------";
 }
+
 void printSparseMat(const Eigen::SparseMatrix<float>& mat, const std::string& descr) {
     Eigen::IOFormat CleanFmt(6, 0, ", ", "\n", "[", "]");
     std::cout << "\n\n" << descr << ":\n" << Eigen::MatrixXf(mat).format(CleanFmt) << "\n-----------------------";
@@ -292,10 +292,11 @@ void Particles<double, 3>::BackwardEuler_implicit(
 template<class T, int dim>
 void Particles<T, dim>::ForwardEuler_explicit() {
     const T invM = 1.0 / mass;
+    const T mg = mass*gravity;
     for(uint32_t i = 0; i < pos.size(); ++i) {
         pos[i] += dt * vel[i];
         Eigen::Matrix<T, dim, 1> f = sprDampForce[i] + sprElastForce[i] + bendDampForce[i] + bendElastForce[i];
-        f[1] += mass*gravity;
+        f[1] += mg;
         vel[i] += dt * invM * f;
     }
 }
@@ -308,7 +309,7 @@ void Particles<T, dim>::CheckSelf( const std::vector<std::tuple<uint32_t, uint32
     const T headRoom = Particles<T, dim>::HEADROOM;
     const T L0_d_MaxStretch = std::get<2>(springs[1]) * (1.0 + headRoom);//NOT A RATIO, ACTUAL dist
     const T radius = L0_d_MaxStretch * 0.25;//prevent worst case force field falls through middle of quad
-    const T minDist = radius*2.0;
+    const T minDist = radius*2.1;//add a little to prevent issues (still can fall through due to iterative pass adjustments not being enough)
     const uint32_t passes = 1;//adjusting one will affect the others
 
     const uint32_t size = pos.size();
@@ -347,12 +348,13 @@ void Particles<T, dim>::CheckOtherCloth(
     const T headRoom = Particles<T, dim>::HEADROOM;
     const T L0_d_MaxStretch = std::get<2>(springs[1]) * (1.0 + headRoom);//NOT A RATIO, ACTUAL dist
     const T radius = L0_d_MaxStretch * 0.25;//prevent worst case force field falls through middle of quad
-    const T minDist = radius*2.0;
+    const T minDist = radius*2.1;//add a little to prevent issues (still can fall through due to iterative pass adjustments not being enough)
     const uint32_t passes = 1;//adjusting one will affect the others
 
     const uint32_t size = pos.size();
     for(uint32_t i = 0; i < passes; ++i) {
         for(uint32_t j = 0; j < size; ++j) {//the main particle
+
             for(uint32_t k = 0; k < size; ++k) {//the one in the otherCloth to check against
                 //check if sphere fields collide, if so push apart along vec that connects them
                 //subtract off vel component (or zero out?)
@@ -364,9 +366,10 @@ void Particles<T, dim>::CheckOtherCloth(
                 const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minDist - l));
                 pos[j] +=  adjustPos;
                 otherCloth.pos[k] += -adjustPos;
-
                 vel[j] -= (vel[j].dot(n12)*n12);
                 otherCloth.vel[k] -= (otherCloth.vel[k].dot(n12)*n12);//still works out, no need to negate n12
+
+
             }//k
         }//j
     }//passes
@@ -379,10 +382,10 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
         const std::vector<Eigen::Matrix<T,dim,1>, Eigen::aligned_allocator<Eigen::Matrix<T,dim,1>>>& velOrig
 )
 {
-    const T headRoom = Particles<T, dim>::HEADROOM;
+    const T headRoom = Particles<T, dim>::HEADROOM;//this is a percentage of the rest length
     const T maxStretch = 1.0+headRoom;//THIS IS A RATIO
     const T minStretch = 1.0-headRoom;
-    const uint32_t passes = 1;//adjusting one will affect teh others
+    const uint32_t passes = 6;//adjusting one will affect teh others, need more for large dt steps on backward euler
 
     //was added in each of the stretch if statements but has issues
 //                vel[one] -= (vel[one].dot(n12)*n12);//HAS BAD ARTIFACTS, PROBABLY OVER CORRECTS (MANY SPRINGS ATTACHED TO PARTICLE)
@@ -397,11 +400,31 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
             n12.normalize();//or just divide by l
             const T restLen = std::get<2>(tup);
             const T stretch = l / restLen;
+            bool oneFixed = false;
+            bool twoFixed = false;
+            for(uint32_t i = 0; i < fixedPos.size(); ++i) {
+                if(fixed[i] == one) {oneFixed = true;}
+                if(fixed[i] == two) {twoFixed = true;}
+            }
             if (stretch < minStretch) {
-                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(minStretch - stretch) * restLen);
-                pos[one] +=  adjustPos;
-                pos[two] += -adjustPos;
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.50*(minStretch - stretch) * restLen);
 
+                if(!oneFixed && !twoFixed) {
+                    pos[one] +=  adjustPos;
+                    pos[two] += -adjustPos;
+//                    vel[one] -= (vel[one].dot(n12)*n12);
+//                    vel[two] -= (vel[two].dot(n12)*n12);
+                } else if (oneFixed && !twoFixed) {
+                    pos[two] += -2.0 * adjustPos;
+//                    vel[two] -= (vel[two].dot(n12)*n12);
+                } else if (!oneFixed && twoFixed) {
+                    pos[one] +=  2.0*adjustPos;
+//                    vel[one] -= (vel[one].dot(n12)*n12);
+                } else if (oneFixed && twoFixed) {
+                    //do nothing
+                }
+
+//                //THE MANY UPDATES CAUSES EXPLOSIONS (prob because posOrig isnt getting updated in the 2 lines above)
 //                //vel that could have been used to get from pre-euler update to this adjusted post euler update
 //                Eigen::Matrix<T, dim, 1> actualVel = (pos[one] - posOrig[one]) / dt;
 //                //diff between vel that was used and vel that could have been used
@@ -412,9 +435,21 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
 //                diffVel = velOrig[two] - actualVel;
 //                vel[two] -= diffVel;
             } else if( stretch > maxStretch) {
-                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.5*(stretch - maxStretch) * restLen);
-                pos[one] += -adjustPos;
-                pos[two] +=  adjustPos;
+                const Eigen::Matrix<T, dim, 1> adjustPos = n12 * (0.50*(stretch - maxStretch) * restLen);
+                if(!oneFixed && !twoFixed) {
+                    pos[one] += -adjustPos;
+                    pos[two] +=  adjustPos;
+//                    vel[one] -= (vel[one].dot(n12)*n12);
+//                    vel[two] -= (vel[two].dot(n12)*n12);
+                } else if (oneFixed && !twoFixed) {
+                    pos[two] += 2.0 * adjustPos;
+//                    vel[two] -= (vel[two].dot(n12)*n12);
+                } else if (!oneFixed && twoFixed) {
+                    pos[one] += -2.0*adjustPos;
+//                    vel[one] -= (vel[one].dot(n12)*n12);
+                } else if (oneFixed && twoFixed) {
+                    //no nothing
+                }
 
 //                //vel that could have been used to get from pre-euler update to this adjusted post euler update
 //                Eigen::Matrix<T, dim, 1> actualVel = (pos[one] - posOrig[one]) / dt;
@@ -429,6 +464,8 @@ void Particles<T, dim>::AdjustForMaxMinStretch(
         }//tup
     }//passes
 
+    //can cause oscillations, vs the gram schmidt method in the two ifs above but they correct as well as this
+    //causes reflections when hitting the ground if performed after ground update (or any other objects)
     for(uint32_t i = 0; i < pos.size(); ++i) {
         //vel that could have been used to get from pre-euler update to this adjusted post euler update
         const Eigen::Matrix<T, dim, 1> actualVel = (pos[i] - posOrig[i]) / dt;

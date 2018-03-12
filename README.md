@@ -11,17 +11,19 @@
 * Structural springs ensure the cloth exhibits cloth like behavior along the longitude, latitude, and shear directions.
 * Bend springs exist between between every other vertex on up, down, left, right direction. 
 * Bend springs ensure the cloth is locally flat by activating during compression by pushing away adjacent quad faces of the cloth.
-* Stretch and compression limits are set on the cloth at an amount of 10% to make the cloth behave more like yarn material rather than a rubber material.
+* Stretch and compression limits are set on the cloth at an amount of 10% 
+* This is done to make the cloth behave more like yarn material rather than a rubber material.
 ![](clothSetup.png)
 
 # Notes on collisions
 * For collision, the cloth particles are represented as spheres. 
 * Collision is then checking every sphere against every other sphere (for both self collision and other cloth collision).
 * If within range, if within range the particles are pushed apart so they are no longer touching.
-* Colliding vertices' velocities are adjusted by subtracting off the component of velocity perpendicular to the plane of collision.
+* Velocity adjusted by subtracting off the component perpendicular to the plane of collision.
 * This is similar to Granm-Schmidt orthogonalization
 ![](GramSchmidt.png)
 ![](collisionCloth.png)
+
 
 **Backward Euler Sim (30x30 cloth)**<br />
 ![](BE3.gif)
@@ -35,6 +37,11 @@
 **Backward Euler Sim (30x30 cloth)**<br />
 ![](BE3.gif)
 
+# Thoughts on FE vs BE
+* BE is very slow even when taking many more steps than FE.
+* BE code is more complex than FE
+* BE must begin to include capsule capsule collision tests
+* BE must do more complex collision testing and adjustments when taking large timesteps
 **Graphs**<br />
 ![](graph1.png)
 ![](graph2.png)

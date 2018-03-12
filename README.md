@@ -38,10 +38,10 @@
 ![](BE3.gif)
 
 # Thoughts on FE vs BE
-* BE is very slow even when taking many more steps than FE.
-* BE code is more complex than FE
-* BE must begin to include capsule capsule collision tests
-* BE must do more complex collision testing and adjustments when taking large timesteps
+* FE is still much faster even when taking many more steps than BE.
+* BE code is more complex than FE.
+* BE must begin to include capsule capsule collision tests at larger time steps.
+* BE must do more complex collision testing and adjustments when taking large time steps.
 **Graphs**<br />
 ![](graph1.png)
 ![](graph2.png)

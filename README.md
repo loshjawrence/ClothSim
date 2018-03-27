@@ -2,6 +2,9 @@
 * Lecture materials 
 * https://graphics.stanford.edu/~mdfisher/cloth.html 
 
+# Project Link
+* https://github.com/loshjawrence/ClothSim 
+
 # Files
 * videos and .gif's in top level folder(*.gif, JoshLawrence_AllBasicTests*.mp4)
 * README.pdf of this README.md also in top level folder

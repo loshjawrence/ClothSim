@@ -35,6 +35,11 @@
 * This is similar to Granm-Schmidt orthogonalization
 
 ![](GramSchmidt.png)
+
+* Green points are 4 adjacent vertices in cloth (a cloth square), lines connecting them are their structural and shear springs, the black spheres are their collision bounds
+* Red sphere is a collision bound of the same cloth or a different cloth. 
+* Sphere radius set for worst case scenario: a sphere falling through the center of a cloth square when all springs in the square are stretched to their limit.
+
 ![](collisionCloth.png)
 
 
